@@ -42,16 +42,6 @@ storage/**
 !storage/.gitkeep
 !storage/**/.gitkeep
 
-# Detector models & large weights
-models/
-!models/.gitkeep
-services/detector/models/
-!services/detector/models/.gitkeep
-*.pt
-*.onnx
-*.engine
-*.weights
-
 # Env & secrets
 .env
 .env.*
