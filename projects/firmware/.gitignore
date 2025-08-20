@@ -1,0 +1,10 @@
+**/.pdm/
+**/build/
+**/Debug/
+**/Release/
+*.o
+*.d
+*.map
+*.elf
+*.hex
+*.bin

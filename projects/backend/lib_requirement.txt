@@ -1,0 +1,20 @@
+# =========================================
+# lib_requirements
+# Dùng khi chạy bằng venv "my_env" (không Docker)
+# Gợi ý pin phiên bản ổn định; có thể điều chỉnh theo môi trường thực tế.
+# =========================================
+
+# ---- CORE ----
+fastapi~=0.112
+uvicorn[standard]~=0.30
+pydantic~=2.8
+
+# ---- DATABASE (API) ----
+PyMySQL~=1.1
+
+# ---- DETECTOR (CV/AI) ----
+opencv-python-headless~=4.10
+ultralytics~=8.3
+torch~=2.3  # CPU-only; nếu lỗi cài đặt, tham khảo https://pytorch.org/get-started/locally/
+numpy~=1.26
+pillow~=10.4

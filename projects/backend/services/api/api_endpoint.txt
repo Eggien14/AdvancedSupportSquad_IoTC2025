@@ -1,0 +1,102 @@
+# =========================================
+# services/api/api_endpoint.txt
+# Tài liệu endpoint (copy dùng nhanh cho QA/DevOps)
+# =========================================
+
+# ====== BASE URL ======
+# Localhost : http://localhost:8000
+# LAN       : http://<HOST_IP>:8000
+# Docs      : http://<BASE>/docs
+# Health    : http://<BASE>/healthz
+
+# I) SỨC KHOẺ DỊCH VỤ
+# --------------------
+# [GET] /healthz
+# 200 -> {"status":"ok"}
+
+# II) GIỎ HÀNG (CART)
+# -------------------
+# 1) [POST] /cart/{cart_id}/items
+#    - Mục đích: Ghi trạng thái giỏ theo 1 trong 3 chế độ.
+#    - Path: cart_id (int >= 1)
+#    - Body (JSON):
+#      a) mode=replace  (thay toàn bộ)
+#         {"mode":"replace","items":[{"product_id":1,"quantity":2},{"product_id":6,"quantity":1}]}
+#      b) mode=merge    (ghi tuyệt đối từng phần; phần khác giữ nguyên)
+#         {"mode":"merge","items":[{"product_id":1,"quantity":3}]}
+#      c) mode=delta    (cộng/trừ theo thay đổi; không để âm)
+#         {"mode":"delta","changes":[{"product_id":1,"delta":-1},{"product_id":3,"delta":2}]}
+#    - 200 -> {"ok":true,"mode":"<replace|merge|delta>","items_count":<int>}
+#    - 400 -> mode không hỗ trợ / cart_id < 1 / FK product_id không tồn tại
+
+# 2) [GET] /cart/{cart_id}
+#    - Trả giỏ đã JOIN tên & giá + tổng tiền.
+#    - 200 -> {
+#              "cart_id":142,
+#              "items":[
+#                 {"product_id":1,"name":"Vở Hồng Hà","quantity":2,"price":12000,"subtotal":24000},
+#                 ...
+#              ],
+#              "total":78000
+#            }
+#    - 400 -> cart_id < 1
+
+# III) SẢN PHẨM (PRODUCTS)
+# ------------------------
+# 1) [GET] /products/{product_id}
+#    - Trả chi tiết: {product_id, name, price, type, area, manufacturer, expiry_or_mfg_date, origin, info1, info2, detail1, detail2}
+#    - 404 nếu không tồn tại
+
+# 2) [GET] /products?name=<text>&limit=<int=20>
+#    - Tìm theo tên (LIKE %<text>%)
+#    - 200 -> danh sách rút gọn: [{product_id, name, price}, ...]
+
+# 3) [GET] /products/by-area?area=<text>&limit=<int=50>
+#    - Liệt kê theo KHU VỰC (LIKE)
+#    - 200 -> [{product_id, name, price, type, area}, ...]
+
+# 4) [GET] /products/by-type/{p_type}?limit=<int=50>
+#    - Liệt kê theo LOẠI (enum: food|drink|household|stationery)
+#    - 200 -> [{product_id, name, price, type, area}, ...]
+
+# IV) CÁCH TRUY CẬP & LẤY DỮ LIỆU
+# --------------------------------
+# A) Trình duyệt (GET)
+#    - http://localhost:8000/docs
+#    - http://localhost:8000/healthz
+#    - http://localhost:8000/products?name=milo
+#
+# B) cURL nhanh (bash)
+#    - Health:
+#        curl http://localhost:8000/healthz
+#    - Get giỏ:
+#        curl http://localhost:8000/cart/142
+#    - Replace giỏ:
+#        curl -X POST http://localhost:8000/cart/142/items \
+#             -H "Content-Type: application/json" \
+#             -d '{"mode":"replace","items":[{"product_id":1,"quantity":2}]}'
+#    - Delta giỏ:
+#        curl -X POST http://localhost:8000/cart/142/items \
+#             -H "Content-Type: application/json" \
+#             -d '{"mode":"delta","changes":[{"product_id":1,"delta":-1}]}'
+#
+# C) cURL nhanh (PowerShell/Windows - dùng ^ xuống dòng)
+#    curl -X POST http://localhost:8000/cart/142/items ^
+#         -H "Content-Type: application/json" ^
+#         -d "{\"mode\":\"merge\",\"items\":[{\"product_id\":6,\"quantity\":1}]}"
+#
+# D) Từ máy khác cùng mạng (LAN)
+#    - Gọi bằng IP máy chạy API, ví dụ: http://192.168.1.50:8000/products?name=pen
+#    - Nếu không truy cập được: mở firewall cổng 8000 (TCP) trên máy chạy API và kiểm tra port mapping Docker.
+
+# V) MÃ LỖI PHỔ BIẾN
+# ------------------
+# - 200 OK                : thành công
+# - 400 Bad Request       : tham số/body không hợp lệ, mode sai, vi phạm ràng buộc DB
+# - 404 Not Found         : không thấy product/cart phù hợp
+# - 500 Internal Server Error: kiểm tra log container API & kết nối DB
+
+# VI) GHI CHÚ BẢO MẬT TRIỂN KHAI
+# ------------------------------
+# - API mặc định không bật auth; chỉ publish trong LAN khi dev/test.
+# - Nếu xuất Internet: đặt reverse proxy (Nginx/Caddy), TLS, rate-limit; cân nhắc JWT/API key; hạn chế CORS theo domain.

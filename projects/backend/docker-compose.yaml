@@ -1,0 +1,59 @@
+name: advanced_support_squad
+
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456789
+      - MYSQL_DATABASE=iotc25_advanced_support_squad
+      - MYSQL_USER=eggien
+      - MYSQL_PASSWORD=0363802865
+    ports:
+      - "3308:3306"   # host 3308 -> container 3306 (Workbench: 127.0.0.1:3308)
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./db/db_init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=eggien
+      - DB_PASSWORD=0363802865
+      - DB_NAME=iotc25_advanced_support_squad
+      - UVICORN_WORKERS=2
+      - API_PORT=8136
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8136:8136"   # host 8136 -> container 8136
+
+    # Dev hot-reload :
+    # volumes:
+    #   - ./shared:/app/shared
+    #   - ./services/api:/app/services/api
+
+  detector:
+    build:
+      context: .
+      dockerfile: services/detector/Dockerfile
+    restart: unless-stopped
+    environment:
+      - MODEL_PATH=/app/services/detector/models/my_model.pt
+    ports:
+      - "8100:8100"
+
+
+volumes:
+  db_data:
