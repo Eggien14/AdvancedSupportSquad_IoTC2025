@@ -1,0 +1,116 @@
+# =========================================
+# how_to_run.txt
+# Hướng dẫn chạy dự án theo nhiều chế độ (Windows/WSL/macOS/Linux)
+# =========================================
+
+# 0) TIỀN ĐỀ & CỔNG
+# - Yêu cầu: Docker Desktop (Compose v2), Python 3.11, Git.
+# - Cổng mặc định: API=8000, Detector=8100, MySQL=3306 (host có thể map 3308:3306).
+# - Thư mục gốc dự án chứa: docker-compose.yaml, 001_schema.sql, 002_insert.sql, services/.
+
+# 1) CHẠY TOÀN BỘ BẰNG DOCKER-COMPOSE (KHUYẾN NGHỊ)
+# --------------------------------------------------
+# 1.1) Build & up:
+#   docker compose up -d --build
+#   # hoặc chỉ build lại 1 service:
+#   docker compose up -d --build api
+#   docker compose up -d --build detector
+#
+# 1.2) Kiểm tra:
+#   curl http://localhost:8000/healthz
+#   curl http://localhost:8100/healthz
+#   # Swagger:
+#   start http://localhost:8000/docs
+#
+# 1.3) DB (tùy compose): publish 3308:3306 để dùng Workbench:
+#   Host: 127.0.0.1  Port: 3308  User/Pass: theo ENV trong compose  DB: iotc25_advanced_support_squad
+#
+# 1.4) Logs:
+#   docker compose logs -f api
+#   docker compose logs -f detector
+#
+# 1.5) Down & cleanup:
+#   docker compose down
+#   # Xóa container/image/volume cũ (cẩn trọng):
+#   docker system prune -af
+#   docker volume prune -f
+
+# 2) CHẠY TỪNG MODULE RIÊNG BẰNG DOCKER (KHI DB ĐÃ CHẠY SẴN)
+# -----------------------------------------------------------
+# 2.1) API:
+#   docker build -f services/api/Dockerfile -t ass-api .
+#   docker run --rm -p 8000:8000 \
+#     -e DB_HOST=<db_host> -e DB_PORT=3306 \
+#     -e DB_USER=<user>   -e DB_PASSWORD=<pass> -e DB_NAME=<db> \
+#     ass-api
+#
+# 2.2) Detector:
+#   docker build -f services/detector/Dockerfile -t ass-detector .
+#   docker run --rm -p 8100:8100 \
+#     -e MODEL_PATH=/app/services/detector/models/my_model.pt \
+#     ass-detector
+
+# 3) CHẠY KHÔNG QUA DOCKER — DÙNG VENV "my_env"
+# ----------------------------------------------
+# 3.1) Tạo & kích hoạt venv (chọn MỘT trong hai cách):
+#   # Windows PowerShell
+#   py -3.11 -m venv my_env
+#   .\my_env\Scripts\Activate.ps1
+#
+#   # macOS/Linux/WSL
+#   python3.11 -m venv my_env
+#   source my_env/bin/activate
+#
+# 3.2) Cài thư viện:
+#   pip install --upgrade pip
+#   pip install -r lib_requirements
+#   # Lưu ý torch CPU: nếu pip báo lỗi, cài theo hướng dẫn PyTorch chính thức (CPU wheel).
+#
+# 3.3) Chạy MySQL:
+#   # Khuyến nghị vẫn chạy DB bằng container:
+#   docker run -d --name ass-mysql -p 3308:3306 -e MYSQL_ROOT_PASSWORD=secret mysql:8
+#   # Import schema & seed:
+#   mysql -h 127.0.0.1 -P 3308 -u root -psecret < 001_schema.sql
+#   mysql -h 127.0.0.1 -P 3308 -u root -psecret < 002_insert.sql
+#
+# 3.4) Chạy API (local):
+#   set DB_HOST=127.0.0.1        # Windows CMD
+#   set DB_PORT=3308
+#   set DB_USER=root
+#   set DB_PASSWORD=secret
+#   set DB_NAME=iotc25_advanced_support_squad
+#   uvicorn services.api.server:app --reload --port 8000
+#   # PowerShell: $env:DB_HOST="127.0.0.1" ... ; macOS/Linux: export DB_HOST=...
+#
+# 3.5) Chạy Detector (local):
+#   set MODEL_PATH=services/detector/models/my_model.pt
+#   uvicorn services.detector.app:app --reload --port 8100
+#
+# 3.6) Kiểm tra nhanh:
+#   curl http://127.0.0.1:8000/healthz
+#   curl http://127.0.0.1:8100/healthz
+
+# 4) CHẾ ĐỘ HỖN HỢP (MIXED)
+# --------------------------
+# - DB chạy trong Docker; API & Detector chạy bằng venv "my_env".
+# - Ưu điểm: debug code nhanh, không rebuild image; vẫn giữ DB cô lập.
+# - Lưu ý: dùng DB_PORT=3308 khi kết nối tới container MySQL đã publish.
+
+# 5) TRUY CẬP TỪ MÁY KHÁC CÙNG MẠNG (LAN)
+# ---------------------------------------
+# - Lấy IP máy chạy dịch vụ (ipconfig/ifconfig).
+# - Mở firewall inbound TCP cho 8000 (API) và 8100 (Detector).
+# - Máy khác gọi:
+#   http://<HOST_IP>:8000/docs
+#   http://<HOST_IP>:8100/image?cart_id=142
+
+# 6) VẤN ĐỀ THƯỜNG GẶP
+# --------------------
+# - ModuleNotFoundError: No module named 'services.shared'
+#   => thiếu __init__.py, chưa COPY shared/ vào image, hoặc PYTHONPATH sai.
+# - API không kết nối DB:
+#   => sai ENV DB_*; DB chưa khởi tạo schema/seed; port mapping 3308:3306 chưa đúng.
+# - Detector không có ảnh (/image 404):
+#   => URL camera lỗi/chậm; chờ vài giây để thread nạp frame; kiểm tra CARTS trong config.py.
+# - Torch/Ultralytics cài khó:
+#   => dùng Docker cho detector; nếu venv: cài torch CPU theo hướng dẫn chính thức (không bắt buộc GPU).

@@ -1,0 +1,58 @@
+﻿# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.code-workspace
+
+# Python cache / build
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.build/
+build/
+dist/
+.eggs/
+*.egg-info/
+wheels/
+.cache/
+.mypy_cache/
+.pytest_cache/
+.tox/
+.nox/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual env (your local venv)
+ASS_env/
+.venv/
+venv/
+env/
+ENV/
+
+# Logs
+logs/
+logs/**
+
+# Runtime data
+storage/**
+!storage/.gitkeep
+!storage/**/.gitkeep
+
+# Detector models & large weights
+models/
+!models/.gitkeep
+services/detector/models/
+!services/detector/models/.gitkeep
+*.pt
+*.onnx
+*.engine
+*.weights
+
+# Env & secrets
+.env
+.env.*
+!.env.example

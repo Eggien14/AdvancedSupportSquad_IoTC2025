@@ -1,0 +1,74 @@
+# Git / meta
+.git
+.gitignore
+.gitattributes
+.github/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.code-workspace
+
+# Python cache / test / build
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.build/
+build/
+dist/
+.eggs/
+*.egg-info/
+wheels/
+.cache/
+.mypy_cache/
+.pytest_cache/
+.tox/
+.nox/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+tests/
+docs/
+
+# Virtual env (không copy vào image)
+ASS_env/
+.venv/
+venv/
+env/
+ENV/
+
+# Logs / temp
+logs/
+logs/**
+*.log
+*.tmp
+*.bak
+
+# Env files (truyền qua compose/runtime)
+.env
+.env.*
+
+# Local data & artifacts không cần trong image
+storage/**
+models/
+services/detector/models/
+
+# DB scripts không cần cho image API/Detector (compose sẽ mount từ host)
+db/
+# hoặc chỉ SQL:
+# db/**/*.sql
+
+# Large weights
+*.pt
+*.onnx
+*.engine
+*.weights
+
+# Tài liệu/hướng dẫn không cần cho runtime
+READ_ME.md
+how_to_run.txt
+lib_requirement.txt
