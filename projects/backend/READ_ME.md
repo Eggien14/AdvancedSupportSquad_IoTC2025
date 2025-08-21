@@ -11,8 +11,6 @@
 ├─ 002_insert.sql               # Dữ liệu mẫu
 ├─ how_to_run.txt               # Hướng dẫn chạy dự án (compose / module lẻ / venv)
 ├─ lib_requirements             # Tổng hợp libs khi chạy bằng venv "my_env" (không Docker)
-├─ server_01.png                # Hình tham khảo cấu trúc (optional)
-├─ server_02.png                # Hình tham khảo cấu trúc (optional)
 ├─ services/
 │  ├─ api/                      # REST API cho cart & products (FastAPI + MySQL)
 │  │  ├─ server.py              # Khởi tạo app + endpoints /healthz, /cart/*, /products/*

@@ -52,11 +52,6 @@ logs/**
 .env
 .env.*
 
-# Local data & artifacts không cần trong image
-storage/**
-models/
-services/detector/models/
-
 # DB scripts không cần cho image API/Detector (compose sẽ mount từ host)
 db/
 # hoặc chỉ SQL:
