@@ -8,6 +8,27 @@ from services.shared.repos import ProductRepo, CartRepo
 
 app = FastAPI(title="Cart API", version="0.2.0")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],      # mở cho mọi origin để test
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=False,
+)
+
+# ALLOWED_ORIGINS = [
+#     "http://homeassistant.local:8123",                          # HA bằng hostname (HTTP)
+#     "http://192.168.102.10:8123",                               # HA bằng IP (HTTP)
+#     "https://uxi7soczbvmgx2ceeypofsshklpfutyl.ui.nabu.casa",    # HA qua Nabu Casa (HTTPS)
+# ]
+
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=ALLOWED_ORIGINS,
+#     allow_methods=["GET", "OPTIONS"],
+#     allow_headers=["*"],
+#     allow_credentials=True,  # dùng True khi có cookie/withCredentials
+# )
 
 @app.get("/healthz")
 def healthz():

@@ -53,7 +53,7 @@ logs/**
 .env.*
 
 # DB scripts không cần cho image API/Detector (compose sẽ mount từ host)
-db/
+# db/
 # hoặc chỉ SQL:
 # db/**/*.sql
 
