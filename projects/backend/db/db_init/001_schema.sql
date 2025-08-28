@@ -8,9 +8,11 @@ USE iotc25_advanced_support_squad;
 CREATE TABLE IF NOT EXISTS product_master (
   product_id            INT AUTO_INCREMENT PRIMARY KEY,
   product_name          VARCHAR(255)        NOT NULL,
-  product_type          ENUM('food','drink','household','stationery') NOT NULL,
+  product_type          VARCHAR(64)         NOT NULL,
   area                  VARCHAR(64)         NULL,
   price                 DECIMAL(10,2)       NOT NULL DEFAULT 0.00,
+  quantity              DECIMAL(10,3)       NOT NULL DEFAULT 999.000 COMMENT 'Số lượng sản phẩm trong kho (decimal cho cả đơn vị và khối lượng)',
+  weight_kg             DECIMAL(8,3)        NULL COMMENT 'Khối lượng thực tế (kg) - 0 = bán theo số lượng, >0 = bán theo cân',
   manufacturer          VARCHAR(128)        NULL,
   expiry_or_mfg_date    DATE                NULL,
   origin                VARCHAR(128)        NULL,
@@ -27,10 +29,32 @@ CREATE TABLE IF NOT EXISTS product_master (
 CREATE TABLE IF NOT EXISTS cart_items (
   cart_id     BIGINT          NOT NULL,
   product_id  INT             NOT NULL,
-  quantity    INT UNSIGNED    NOT NULL DEFAULT 0,
+  quantity    DECIMAL(10,3)   NOT NULL DEFAULT 0.000 COMMENT 'Số lượng hoặc khối lượng sản phẩm trong giỏ',
   PRIMARY KEY (cart_id, product_id),
   CONSTRAINT fk_cart_items_product
     FOREIGN KEY (product_id) REFERENCES product_master(product_id)
     ON UPDATE CASCADE
     ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Bảng cấu hình cart: thông tin BLE và camera cho từng cart
+CREATE TABLE IF NOT EXISTS cart_config (
+  cart_id           BIGINT          NOT NULL PRIMARY KEY,
+  cart_position     VARCHAR(36)     NULL COMMENT 'UUID BLE cho position',
+  cart_state        VARCHAR(36)     NULL COMMENT 'UUID BLE cho state', 
+  cart_voice_cmd    VARCHAR(36)     NULL COMMENT 'UUID BLE cho voice command',
+  cart_ota          VARCHAR(36)     NULL COMMENT 'UUID BLE cho OTA',
+  cam_stream_url    VARCHAR(512)    NULL COMMENT 'URL stream camera'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Bảng map beacon: thông tin vị trí và cấu hình beacon cho định vị
+CREATE TABLE IF NOT EXISTS map_beacon (
+  map_id            BIGINT          NOT NULL,
+  beacon_id         VARCHAR(10)     NOT NULL,
+  beacon_blea_uuid  VARCHAR(36)     NULL COMMENT 'UUID BLE của beacon',
+  beacon_x_coordinate DECIMAL(10,3) NULL COMMENT 'Tọa độ X của beacon',
+  beacon_y_coordinate DECIMAL(10,3) NULL COMMENT 'Tọa độ Y của beacon', 
+  beacon_D0         DECIMAL(6,1)    NULL COMMENT 'RSSI tại khoảng cách 1m (dBm)',
+  beacon_n          DECIMAL(4,2)    NULL COMMENT 'Hệ số suy hao tín hiệu môi trường',
+  PRIMARY KEY (map_id, beacon_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

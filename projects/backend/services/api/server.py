@@ -1,106 +1,247 @@
 # services/api/server.py
+"""
+Simple FastAPI application for IoTC25 Advanced Support Squad.
+"""
 from decimal import Decimal
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
-from services.api.schemas.cart import CartUpsert, CartResponse, CartItem
-from services.api.schemas.product import ProductType, Product, ProductDetail, ProductListItem
-from services.shared.repos import ProductRepo, CartRepo
+from services.api.schemas.cart_inventory import CartUpsert, CartResponse, CartItem
+from services.api.schemas.product import Product, ProductDetail, ProductListItem, ProductSimple, ProductUpdate
+from services.api.schemas.cart_config import CartConfigRequest, CartConfigResponse
+from services.api.schemas.map_beacon import MapBeaconRequest, MapBeaconResponse, MapBeaconListResponse
+from services.shared.services import ProductService, CartService, CartConfigService, MapBeaconService
+from services.shared.settings import get_settings
 
-app = FastAPI(title="Cart API", version="0.2.0")
+# Get settings
+settings = get_settings()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],      # mở cho mọi origin để test
-    allow_methods=["*"],
-    allow_headers=["*"],
-    allow_credentials=False,
+# Create FastAPI app
+app = FastAPI(
+    title="IoTC25 Advanced Support Squad API",
+    version="2.0.0",
+    description="API for product and cart management"
 )
 
-# ALLOWED_ORIGINS = [
-#     "http://homeassistant.local:8123",                          # HA bằng hostname (HTTP)
-#     "http://192.168.102.10:8123",                               # HA bằng IP (HTTP)
-#     "https://uxi7soczbvmgx2ceeypofsshklpfutyl.ui.nabu.casa",    # HA qua Nabu Casa (HTTPS)
-# ]
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=ALLOWED_ORIGINS,
-#     allow_methods=["GET", "OPTIONS"],
-#     allow_headers=["*"],
-#     allow_credentials=True,  # dùng True khi có cookie/withCredentials
-# )
+# Create services
+product_service = ProductService()
+cart_service = CartService()
 
-@app.get("/healthz")
-def healthz():
+# Health check endpoint
+@app.get("/healthz", tags=["Health"])
+async def health_check():
+    """Health check endpoint"""
     return {"status": "ok"}
 
-
-# ---------- CART ----------
-
-@app.post("/cart/{cart_id}/items")
-def upsert_cart(cart_id: int, payload: CartUpsert):
-    if cart_id <= 0:
-        raise HTTPException(status_code=400, detail="cart_id must be >= 1")
-
+# Cart inventory endpoints
+@app.post("/cart_inventory/{cart_id}/items", tags=["Carts Inventory"])
+async def update_cart_items(cart_id: int, cart_data: CartUpsert):
+    """Create or update cart items"""
     try:
-        if payload.mode == "replace":
-            CartRepo.replace(cart_id, ((it.product_id, it.quantity) for it in payload.items))
-        elif payload.mode == "merge":
-            CartRepo.merge(cart_id, ((it.product_id, it.quantity) for it in payload.items))
-        elif payload.mode == "delta":
-            CartRepo.apply_delta(cart_id, ((ch.product_id, ch.delta) for ch in payload.changes))
-        else:
-            raise HTTPException(status_code=400, detail=f"Unsupported mode: {payload.mode}")
+        result = cart_service.upsert_cart_items(cart_id, cart_data)
+        return result
     except Exception as e:
-        # ví dụ FK lỗi khi product_id không tồn tại
-        raise HTTPException(status_code=400, detail=str(e))
-
-    return {"ok": True, "mode": payload.mode, "items_count": CartRepo.count_items(cart_id)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/cart/{cart_id}", response_model=CartResponse)
-def get_cart(cart_id: int):
-    if cart_id <= 0:
-        raise HTTPException(status_code=400, detail="cart_id must be >= 1")
-
-    rows, total = CartRepo.fetch_joined(cart_id)
-    items = [
-        CartItem(
-            product_id=row["product_id"],
-            name=row["name"],
-            quantity=row["quantity"],
-            price=row["price"],
-            subtotal=row["subtotal"],
-        )
-        for row in rows
-    ]
-    return CartResponse(cart_id=cart_id, items=items, total=total)
+@app.get("/cart_inventory/{cart_id}", response_model=CartResponse, tags=["Carts Inventory"])
+async def get_cart_detail(cart_id: int):
+    """Get cart detail by ID"""
+    try:
+        cart = cart_service.get_cart_with_totals(cart_id)
+        if not cart:
+            raise HTTPException(status_code=404, detail="Cart not found")
+        return cart
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-# ---------- PRODUCTS ----------
+# Product endpoints  
+@app.get("/products/list-all-product", response_model=list[ProductSimple], tags=["Products"])
+async def list_all_products():
+    """Trả lại toàn bộ danh sách sản phẩm (chỉ ID và name)"""
+    try:
+        products = product_service.list_all_products_simple()
+        return products
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/products/{product_id}", response_model=ProductDetail)
-def get_product(product_id: int):
-    row = ProductRepo.get_by_id(product_id)
-    if not row:
-        raise HTTPException(status_code=404, detail="Product not found")
-    return row
+@app.get("/products", response_model=list[ProductListItem], tags=["Products"])
+async def search_products(name: str = None, limit: int = 50):
+    """Search products by name"""
+    try:
+        products = product_service.search_products(name=name, limit=limit)
+        return products
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/products", response_model=list[Product])
-def search_products(name: str, limit: int = 20):
-    return ProductRepo.search_by_name(name=name, limit=limit)
+@app.get("/products/{product_id}", response_model=ProductDetail, tags=["Products"])
+async def get_product_detail(product_id: int):
+    """Get product detail by ID"""
+    try:
+        product = product_service.get_product_detail(product_id)
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        return product
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/products/by-area", response_model=list[ProductListItem])
-def list_products_by_area(area: str, limit: int = 50):
+@app.get("/products/by-area/{area}", response_model=list[ProductListItem], tags=["Products"])
+async def get_products_by_area(area: str, limit: int = 50):
+    """Get products by area"""
+    try:
+        products = product_service.list_products_by_area(area=area, limit=limit)
+        return products
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/products/by-type/{product_type}", response_model=list[ProductListItem], tags=["Products"])
+async def get_products_by_type(product_type: str, limit: int = 50):
+    """Get products by type - accepts any string, not limited to enum"""
+    try:
+        products = product_service.list_products_by_type(product_type=product_type, limit=limit)
+        return products
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/products/update-product/{product_id}", response_model=ProductDetail, tags=["Products"])
+async def update_product(product_id: int, product_data: ProductUpdate):
     """
-    Liệt kê theo KHU VỰC: trả id, name, price, type, area.
+    Cập nhật hoặc tạo mới sản phẩm:
+    - Nếu product_id chưa tồn tại: Tạo mới với đầy đủ thông tin
+    - Nếu product_id đã tồn tại: Cập nhật thông tin, trường NULL có thể thiếu
     """
-    return ProductRepo.list_by_area(area=area, limit=limit)
+    try:
+        # Validate product_id
+        if product_id <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Product ID must be a positive integer"
+            )
+        
+        # Convert pydantic model to dict, handling None values properly
+        product_dict = product_data.model_dump()
+        
+        # Validate required fields for business logic
+        required_fields = ['product_name', 'product_type', 'price', 'quantity']
+        for field in required_fields:
+            if product_dict.get(field) is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Required field '{field}' cannot be null or empty"
+                )
+        
+        # Handle empty strings as NULL for optional fields
+        optional_fields = ['area', 'manufacturer', 'origin', 'info1', 'info2', 'detail1', 'detail2']
+        for field in optional_fields:
+            if field in product_dict and product_dict[field] == "":
+                product_dict[field] = None
+        
+        result = product_service.update_or_create_product(product_id, product_dict)
+        return result
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-@app.get("/products/by-type/{p_type}", response_model=list[ProductListItem])
-def list_products_by_type(p_type: ProductType, limit: int = 50):
+
+@app.post("/products/delete-product/{product_id}", tags=["Products"])
+async def delete_product(product_id: int):
     """
-    Liệt kê theo LOẠI: trả id, name, price, type, area.
+    Xóa sản phẩm theo ID
     """
-    return ProductRepo.list_by_type(p_type=p_type.value, limit=limit)
+    try:
+        result = product_service.delete_product(product_id)
+        return result
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+# Cart Config Endpoints
+cart_config_service = CartConfigService()
+
+# Map Beacon Endpoints
+map_beacon_service = MapBeaconService()
+
+@app.get("/cart_infor/{cart_id}", response_model=CartConfigResponse, tags=["Carts Config"])
+async def get_cart_config(cart_id: int):
+    """Lấy thông tin cấu hình của cart"""
+    try:
+        config = cart_config_service.get_cart_config(cart_id)
+        return config
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/cart_infor/{cart_id}", response_model=CartConfigResponse, tags=["Carts Config"])
+async def update_cart_config(cart_id: int, config: CartConfigRequest):
+    """Cập nhật hoặc tạo mới cấu hình cart"""
+    try:
+        updated_config = cart_config_service.update_cart_config(cart_id, config.model_dump())
+        return updated_config
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/map_beacon/{map_id}", response_model=MapBeaconListResponse, tags=["Map Beacon"])
+async def get_map_beacons(map_id: int):
+    """Lấy tất cả beacon của map_id"""
+    try:
+        beacons_data = map_beacon_service.get_map_beacons(map_id)
+        return beacons_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/map_beacon/{map_id}/{beacon_id}", response_model=MapBeaconResponse, tags=["Map Beacon"])
+async def get_beacon_config(map_id: int, beacon_id: str):
+    """Lấy thông tin cấu hình của 1 beacon cụ thể"""
+    try:
+        beacon = map_beacon_service.get_beacon_config(map_id, beacon_id)
+        return beacon
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/map_beacon/{map_id}/{beacon_id}", response_model=MapBeaconResponse, tags=["Map Beacon"])
+async def update_beacon_config(map_id: int, beacon_id: str, beacon: MapBeaconRequest):
+    """Cập nhật hoặc tạo mới cấu hình beacon"""
+    try:
+        updated_beacon = map_beacon_service.update_beacon_config(map_id, beacon_id, beacon.model_dump())
+        return updated_beacon
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Run the application
+if __name__ == "__main__":
+    import uvicorn
+    
+    port = int(settings.api_port)
+    uvicorn.run(
+        "server:app",
+        host="0.0.0.0",
+        port=port,
+        reload=False
+    )
 

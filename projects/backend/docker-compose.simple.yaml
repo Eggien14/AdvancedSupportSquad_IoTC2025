@@ -1,0 +1,56 @@
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456789
+      - MYSQL_DATABASE=iotc25_advanced_support_squad
+      - MYSQL_USER=eggien
+      - MYSQL_PASSWORD=0363802865
+    ports:
+      - "3308:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./db/db_init/001_schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+      - ./db/db_insert/002_insert_product_master.sql:/docker-entrypoint-initdb.d/002_insert_product_master.sql:ro
+      - ./db/db_insert/003_insert_cart_items.sql:/docker-entrypoint-initdb.d/003_insert_cart_items.sql:ro
+      - ./db/db_insert/004_insert_cart_config.sql:/docker-entrypoint-initdb.d/004_insert_cart_config.sql:ro
+      - ./db/db_insert/005_insert_map_beacon.sql:/docker-entrypoint-initdb.d/005_insert_map_beacon.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=eggien
+      - DB_PASSWORD=0363802865
+      - DB_NAME=iotc25_advanced_support_squad
+      - API_PORT=8136
+      - CACHE_ENABLED=false
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8136:8136"
+
+  detector:
+    build:
+      context: .
+      dockerfile: services/detector/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "8100:8100"
+
+volumes:
+  db_data:

@@ -1,107 +1,342 @@
-# =========================================
-# services/api/READ_ME.MD
-# Cart & Product API (FastAPI + MySQL)
-# =========================================
+﻿# services/api - FastAPI REST API Service
 
-# 1) MỤC TIÊU & CHỨC NĂNG
-# - Cung cấp REST API cho:
-#   + Giỏ hàng (cart): ghi/đọc trạng thái items theo cart_id với 3 chế độ (replace | merge | delta).
-#   + Sản phẩm (products): xem chi tiết, tìm theo tên, liệt kê theo khu vực/loại.
-# - I/O:
-#   + Request: HTTP/JSON
-#   + Response: JSON (mã lỗi HTTP chuẩn)
-#   + Healthcheck: GET /healthz -> {"status":"ok"}
-# - DB: MySQL 8; truy cập qua lớp "shared":
-#   + services/shared/db.py      : kết nối MySQL (đọc ENV)
-#   + services/shared/repos.py   : truy vấn CRUD + JOIN phục vụ endpoints
+##  MỤC ĐÍCH & CHỨC NĂNG
 
-# 2) CẤU TRÚC THƯ MỤC CON CỦA API
-services/
-└─ api/
-   ├─ server.py          # Khởi tạo FastAPI + định nghĩa endpoints
-   ├─ schemas/
-   │  ├─ cart.py         # Kiểu dữ liệu request/response cho giỏ hàng
-   │  └─ product.py      # Kiểu dữ liệu sản phẩm (Product, ProductListItem, ProductDetail, ProductType)
-   ├─ Dockerfile         # Image cho service API
-   ├─ requirements.txt   # Thư viện Python cần thiết cho API
-   └─ api_endpoint.txt   # Mô tả chi tiết endpoint (file đi kèm README này)
+Service API này cung cấp REST endpoints cho:
+- **Cart Management**: Quản lý giỏ hàng với 3 modes (replace/merge/delta) + auto inventory sync
+- **Product Management**: CRUD operations cho sản phẩm với inventory tracking  
+- **IoT Configuration**: Cấu hình BLE UUIDs cho cart IoT gateway
+- **Beacon Positioning**: Quản lý beacon map cho indoor navigation system
 
-# 3) ENDPOINTS CHÍNH (tóm tắt)
-# - GET  /healthz
-# - POST /cart/{cart_id}/items        (body: replace|merge|delta)
-# - GET  /cart/{cart_id}              (trả items đã JOIN tên/giá + total)
-# - GET  /products/{product_id}       (chi tiết đầy đủ)
-# - GET  /products?name=...&limit=... (tìm theo tên: id, name, price)
-# - GET  /products/by-area?area=...   (id, name, price, type, area)
-# - GET  /products/by-type/{p_type}   (id, name, price, type, area)
+##  CẤU TRÚC THƯ MỤC
 
-# 4) MÔ HÌNH DỮ LIỆU (rút gọn theo schemas)
-# - Product (list cơ bản): {product_id:int, name:str, price:decimal}
-# - ProductListItem      : {product_id, name, price, type:enum, area:str?}
-# - ProductDetail        : Product + {type, area, manufacturer, expiry_or_mfg_date, origin, info1, info2, detail1, detail2}
-# - CartResponse         : {cart_id:int, items:[{product_id, name, quantity, price, subtotal}], total:decimal}
-# - Upsert body:
-#     replace|merge -> {"mode":"replace|merge","items":[{"product_id":1,"quantity":2},...]}
-#     delta        -> {"mode":"delta","changes":[{"product_id":1,"delta":-1},...]}
+```
+services/api/
+ server.py              #  FastAPI app khởi tạo + endpoint definitions
+ schemas/               #  Pydantic schemas cho request/response
+    __init__.py
+    cart.py           # Cart-related schemas (CartResponse, CartItem, etc.)
+    cart_inventory.py #  Inventory schemas (ReplaceUpsert, MergeUpsert, DeltaUpsert)
+    product.py        # Product schemas (Product, ProductDetail, ProductType)
+    cart_config.py    #  IoT cart configuration schemas
+    map_beacon.py     #  Beacon positioning schemas
+ Dockerfile            #  Container image definition
+ requirements.txt      #  Python dependencies
+ api_endpoint.txt      #  Chi tiết API documentation 
+ READ_ME.MD           #  File này - API service documentation
+```
 
-# 5) ENV BIẾN QUAN TRỌNG (đọc trong shared/db.py)
-# - DB_HOST (mặc định "db" khi chạy cùng docker compose)
-# - DB_PORT (mặc định "3306")
-# - DB_USER
-# - DB_PASSWORD
-# - DB_NAME  (ví dụ: iotc25_advanced_support_squad)
-# Gợi ý thêm (tuỳ bạn dùng): UVICORN_WORKERS=2
+##  CORE COMPONENTS
 
-# 6) GIẢI THÍCH DOCKERFILE (services/api/Dockerfile)
-# - Base: python:3.11-slim
-# - Cài deps: pip install -r services/api/requirements.txt (tách layer để cache build)
-# - Copy code: services/api + services/shared (API phụ thuộc shared)
-# - Tạo __init__.py cho các package "services", "services/api", "services/shared" để import kiểu services.api.*
-# - EXPOSE 8000; CMD chạy Uvicorn: uvicorn services.api.server:app --host 0.0.0.0 --port 8000
-# - Không hardcode secrets vào image; truyền qua ENV / compose.
+### **server.py** - FastAPI Application
+```python
+# Main FastAPI app với:
+- CORS middleware (development)
+- Exception handlers
+- Health check endpoint
+- All business endpoints
+- Auto-generated OpenAPI docs (/docs)
+```
 
-# 7) GIẢI THÍCH requirements.txt (API)
-# - fastapi                 # framework
-# - uvicorn[standard]       # ASGI server
-# - pydantic                # schemas
-# - PyMySQL                 # MySQL driver
-# - (tuỳ chọn) python-dotenv # nếu muốn nạp .env khi dev local
-# Gợi ý pin: fastapi~=0.112, uvicorn[standard]~=0.30, pydantic~=2.8, PyMySQL~=1.1
+### **schemas/** - Data Validation Layer
+```python
+# Pydantic V2 schemas với:
+- Type safety và validation
+- Discriminated unions cho cart operations
+- Request/response models
+- Auto JSON schema generation
+```
 
-# 8) CÁCH CHẠY "CHUYÊN NGHIỆP" (Ưu tiên Docker Compose)
-# A. Docker Compose (khuyến nghị)
-#    1) Thêm service "api" (build từ services/api/Dockerfile), depends_on: [db]
-#    2) Map port: "8000:8000"; Truyền ENV DB_* cho container API
-#    3) docker compose up -d --build api
-#    4) Kiểm tra: curl http://localhost:8000/healthz   |  mở http://localhost:8000/docs
-#
-# B. Docker build & run riêng (khi DB đã chạy sẵn)
-#    docker build -f services/api/Dockerfile -t ass-api .
-#    docker run --rm -p 8000:8000 \
-#      -e DB_HOST=<ip_or_service> -e DB_PORT=3306 \
-#      -e DB_USER=<user> -e DB_PASSWORD=<pass> -e DB_NAME=<db> \
-#      ass-api
-#
-# C. Chạy local (dev, không Docker)
-#    python -m venv .venv && . .venv/bin/activate  # (Windows: .venv\Scripts\activate)
-#    pip install -r services/api/requirements.txt
-#    set DB_HOST=127.0.0.1  # (PowerShell: $env:DB_HOST="127.0.0.1")
-#    uvicorn services.api.server:app --reload --port 8000
-#
-# D. Khởi tạo DB (nếu dùng file SQL):
-#    - Import 001_schema.sql và 002_insert.sql vào MySQL (hoặc mount vào /docker-entrypoint-initdb.d khi chạy container db).
-#
-# E. Truy cập từ LAN:
-#    - Lấy IP máy chạy API (vd 192.168.x.y), mở Firewall cổng 8000 (TCP)
-#    - Gọi từ máy khác: http://192.168.x.y:8000/...
+### **Dependencies**
+```python
+# Service phụ thuộc vào:
+services/shared/
+ db.py          # Database connection (MySQL)
+ repos.py       # Repository layer (data access)
+ services.py    # Business logic layer
+```
 
-# 9) LỖI THƯỜNG GẶP (QUICK FIX)
-# - 400 Bad Request: cart_id < 1; mode không hợp lệ; FK lỗi (product_id không tồn tại)
-# - 404 Not Found     : sản phẩm không tồn tại
-# - DB connect error  : sai ENV hoặc service name "db", quyền user
-# - Không truy cập LAN: sai IP (dùng 127.0.0.1 là loopback), firewall chặn, chưa publish 8000
-# - CORS (nếu gọi từ web khác origin): bật middleware CORS trong server.py (dev/test), hạn chế origin khi production.
+##  API ENDPOINTS SUMMARY
 
-# 10) TÀI LIỆU NỘI BỘ
-# - Swagger UI: /docs
-# - OpenAPI JSON: /openapi.json
+### **Health & Documentation**
+```
+GET  /healthz          # Service health check
+GET  /docs             # Swagger UI documentation  
+GET  /openapi.json     # OpenAPI specification
+```
+
+### **Cart Inventory Management** 
+```
+POST /cart_inventory/{cart_id}/items    # Universal cart update với inventory sync
+GET  /cart_inventory/{cart_id}          # Get cart với product details + totals
+```
+
+### **Product & Warehouse**
+```
+GET  /products/{product_id}             # Product detail + inventory quantity
+GET  /products?name={text}&limit={num}  # Search products by name
+GET  /products/by-area/{area}?limit={}  # List products by warehouse area
+GET  /products/by-type/{type}?limit={}  # List products by type
+```
+
+### **IoT Cart Configuration**   
+```
+GET  /cart_infor/{cart_id}              # Get BLE UUIDs + camera config
+POST /cart_infor/{cart_id}              # Update cart IoT configuration
+```
+
+### **Beacon Positioning System** 
+```
+GET  /map_beacon/{map_id}               # Get all beacons in map
+GET  /map_beacon/{map_id}/{beacon_id}   # Get specific beacon config
+POST /map_beacon/{map_id}/{beacon_id}   # Update beacon (UPSERT)
+```
+
+
+##  PYDANTIC SCHEMAS
+
+### **Cart Inventory Schemas** (cart_inventory.py)
+```python
+# Discriminated Union pattern cho type safety
+class ReplaceUpsert(BaseModel):
+    mode: Literal["replace"] = "replace"
+    items: List[CartItem]
+
+class MergeUpsert(BaseModel):  
+    mode: Literal["merge"] = "merge"
+    items: List[CartItem]
+
+class DeltaUpsert(BaseModel):
+    mode: Literal["delta"] = "delta" 
+    changes: List[CartDelta]
+
+# Union type với discriminator
+CartInventoryRequest = Annotated[
+    Union[ReplaceUpsert, MergeUpsert, DeltaUpsert],
+    Field(discriminator='mode')
+]
+```
+
+### **Product Schemas** (product.py)
+```python
+class Product(BaseModel):           # Basic product info
+    product_id: int
+    name: str
+    price: Decimal
+    quantity: int                   #  Inventory quantity
+
+class ProductDetail(Product):       # Full product details
+    type: str
+    area: Optional[str]
+    weight_kg: Optional[Decimal]
+    manufacturer: Optional[str]
+    # ... other fields
+
+class ProductSimple(BaseModel):     # Simple list for dropdowns
+    product_id: int                 
+    name: str                       # Chỉ ID và name cho gọn
+
+class ProductUpdate(BaseModel):     # Create/Update operations
+    product_name: str               # Required field
+    product_type: str               # Required field  
+    price: Decimal                  # Required field >= 0
+    quantity: int                   # Required field >= 0
+    area: Optional[str]             # Optional fields
+    weight_kg: Optional[Decimal]    # Can be null or empty string
+    manufacturer: Optional[str]     # Empty strings → null
+    # ... other optional fields
+```
+
+### **IoT Configuration** (cart_config.py)
+```python
+class CartConfig(BaseModel):
+    cart_id: int
+    cart_position: Optional[str]    # BLE UUID
+    cart_state: Optional[str]       # BLE UUID  
+    cart_voice_cmd: Optional[str]   # BLE UUID
+    cart_ota: Optional[str]         # BLE UUID
+    cam_stream_url: Optional[str]   # RTSP/HTTP URL
+```
+
+### **Beacon Positioning** (map_beacon.py)
+```python
+class MapBeacon(BaseModel):
+    beacon_id: str
+    beacon_blea_uuid: str
+    beacon_x_coordinate: Decimal
+    beacon_y_coordinate: Decimal  
+    beacon_D0: Decimal             # RSSI at 1m
+    beacon_n: Decimal              # Path loss exponent
+```
+
+
+##  BUSINESS LOGIC
+
+### **Cart Inventory Management**
+API tự động đồng bộ inventory khi thao tác cart:
+
+**Replace Mode:**
+1. Lấy cart hiện tại  tính delta với items mới
+2. Trả inventory: `old_qty - new_qty` (nếu > 0)
+3. Lấy inventory: `new_qty - old_qty` (nếu > 0)  
+4. Thay thế toàn bộ cart
+
+**Merge Mode:**
+1. Cập nhật từng item riêng lẻ
+2. Tính delta cho từng product: `old_cart_qty - new_cart_qty`
+3. Cập nhật inventory tương ứng
+
+**Delta Mode:**
+1. `delta > 0`: Thêm vào cart, lấy từ kho
+2. `delta < 0`: Bỏ khỏi cart, trả về kho (chỉ trả đúng số có)
+3. Smart handling: Cart có 3, delta -5  trả về 3, cart = 0
+
+**Auto Cleanup:** Xóa cart_items có quantity = 0
+
+### **New Product Management APIs** (v2.1)
+
+**GET /products/list-all-product:**
+- Trả về tất cả sản phẩm với chỉ ID + name
+- Không có pagination, tối ưu cho dropdown lists
+- Response schema: `List[ProductSimple]`
+
+**POST /products/update-product/{product_id}:**
+- **UPSERT operation**: Tạo mới nếu ID chưa tồn tại, update nếu đã có
+- **Smart validation**: Required fields (name, type, price, quantity)
+- **Empty string handling**: Chuỗi rỗng `""` → `null` cho optional fields  
+- **Response**: Full ProductDetail sau khi create/update
+
+**POST /products/delete-product/{product_id}:**
+- Xóa vĩnh viễn sản phẩm theo ID
+- **Safety checks**: Kiểm tra tồn tại trước khi xóa
+- **Confirmation response**: Trả về thông tin sản phẩm đã xóa
+
+### **IoT Integration Features**
+- BLE UUID configuration cho cart positioning
+- Camera stream URL management  
+- UPSERT operations (ON DUPLICATE KEY UPDATE)
+
+### **Beacon Positioning System**
+- Map-based beacon management
+- RSSI calibration parameters (D0, n)
+- Coordinate system support cho indoor navigation
+
+##  DEPENDENCIES & INTEGRATION
+
+### **External Dependencies** (requirements.txt)
+```
+fastapi>=0.110.0           # Web framework
+uvicorn[standard]>=0.30.0  # ASGI server
+pydantic>=2.8.0            # Data validation
+PyMySQL>=1.1.0             # MySQL connector
+python-multipart           # Form data support
+```
+
+### **Internal Dependencies**
+```python
+# Import từ shared modules:
+from services.shared.db import get_connection
+from services.shared.repos import (
+    ProductRepo, CartRepo, 
+    CartConfigRepo, MapBeaconRepo  # 
+)
+from services.shared.services import (
+    ProductService, CartService,
+    CartConfigService, MapBeaconService  #   
+)
+```
+
+### **Database Integration**
+- MySQL 8.0 với connection pooling
+- Repository pattern cho data access
+- Foreign key constraints cho data integrity
+- Transaction support cho complex operations
+
+
+##  DEVELOPMENT & DEPLOYMENT
+
+### **Environment Variables**
+```bash
+# Required for database connection
+MYSQL_HOST=mysql           # Container name hoặc IP
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=root123
+MYSQL_DATABASE=ass_main
+
+# Optional API configuration  
+API_HOST=0.0.0.0
+API_PORT=8136
+CORS_ORIGINS=*             # Development only
+LOG_LEVEL=INFO
+```
+
+### **Docker Configuration**
+```dockerfile
+# Dockerfile highlights:
+FROM python:3.11-slim
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY services/api services/api
+COPY services/shared services/shared
+EXPOSE 8136
+CMD ["uvicorn", "services.api.server:app", "--host", "0.0.0.0", "--port", "8136"]
+```
+
+### **Running the API Service**
+
+**Via Docker Compose (Recommended):**
+```bash
+docker-compose up api -d --build
+```
+
+**Local Development:**
+```bash
+# Setup environment
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r services/api/requirements.txt
+
+# Set environment variables
+export MYSQL_HOST=localhost  # PowerShell: $env:MYSQL_HOST="localhost"
+
+# Run with reload
+uvicorn services.api.server:app --reload --port 8136
+```
+
+**Testing the Service:**
+```bash
+# Health check
+curl http://localhost:8136/healthz
+
+# API documentation  
+open http://localhost:8136/docs
+
+# Sample API call
+curl http://localhost:8136/products?name=vở&limit=3
+```
+
+### **Error Handling & Logging**
+- HTTP exception handlers cho clean error responses
+- Console logging cho development (có thể extend cho production)
+- Pydantic validation errors  422 responses
+- Database errors  500 responses với generic message
+
+### **Security Considerations**
+- **Development**: CORS enabled, no authentication
+- **Production**: Recommend JWT/API keys, HTTPS reverse proxy
+- **Input Validation**: Pydantic schemas prevent injection
+- **Database**: Parameterized queries via repository layer
+
+##  API DOCUMENTATION
+
+Để xem chi tiết API endpoints với examples:
+ **Xem file: `api_endpoint.txt`** - Complete API reference với JSON examples
+
+Để test API interactively:  
+ **Visit: `http://localhost:8136/docs`** - Swagger UI
+
+---
+
+**services/api - REST API Service for IoT Cart Management System**  
+*Part of Advanced Support Squad v2.1*

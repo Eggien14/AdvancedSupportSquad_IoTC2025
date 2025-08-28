@@ -5,11 +5,13 @@ from contextlib import asynccontextmanager
 from . import config
 from . import state
 from .object_detect import start_all_detectors
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    print("Starting detector service...")
     app.state.detector_threads = start_all_detectors()  # startup
+    print("Detector service started successfully")
     yield                                             # shutdown: daemon threads auto-exit
+    print("Detector service shutting down...")
 
 app = FastAPI(title="detector", version="1.0.0", lifespan=lifespan)
 
@@ -26,4 +28,5 @@ def image(cart_id: int = Query(..., description="Cart ID")):
 
 @app.get("/inventory")
 def inventory(cart_id: int = Query(..., description="Cart ID")):
-    return JSONResponse(state.get_inventory(cart_id))
+    result = state.get_inventory(cart_id)
+    return JSONResponse(result)

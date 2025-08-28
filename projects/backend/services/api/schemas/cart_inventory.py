@@ -7,12 +7,12 @@ from pydantic import BaseModel, Field, ConfigDict
 class AbsoluteItem(BaseModel):
     """Dòng item với số lượng tuyệt đối (>=0)."""
     product_id: int = Field(ge=1, description="ID sản phẩm")
-    quantity: int = Field(ge=0, description="Số lượng tuyệt đối (snapshot)")
+    quantity: Decimal = Field(ge=0, description="Số lượng tuyệt đối (decimal hỗ trợ cả đơn vị và khối lượng)")
 
 class DeltaChange(BaseModel):
     """Dòng thay đổi số lượng cộng/trừ (có thể âm)."""
     product_id: int = Field(ge=1, description="ID sản phẩm")
-    delta: int = Field(description="Cộng/trừ số lượng (âm/dương)")
+    delta: Decimal = Field(description="Cộng/trừ số lượng (âm/dương, decimal hỗ trợ cả đơn vị và khối lượng)")
 
 class ReplaceUpsert(BaseModel):
     """
@@ -51,7 +51,7 @@ class CartItem(BaseModel):
     """Một mục trong giỏ khi trả về cho client (đã JOIN tên & giá)."""
     product_id: int = Field(ge=1)
     name: str
-    quantity: int = Field(ge=0)
+    quantity: Decimal = Field(ge=0, description="Số lượng trong giỏ (decimal hỗ trợ cả đơn vị và khối lượng)")
     price: Decimal = Field(ge=0)
     subtotal: Decimal = Field(ge=0)
     model_config = ConfigDict(from_attributes=True)
