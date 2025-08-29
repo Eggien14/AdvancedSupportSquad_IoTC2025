@@ -1,0 +1,234 @@
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+mqtt:
+  sensor:
+    - name: "Shopping Cart Payload"
+      state_topic: "product_detected_cart_id_142"
+      value_template: "{{ value_json.total }}"
+      json_attributes_topic: "product_detected"
+
+logger:
+  default: warning
+  logs:
+    custom_components.cart_ble: debug
+    bleak: debug
+    homeassistant.components.bluetooth: debug
+
+input_text:
+  api_base:
+    name: API Base URL
+    initial: "http://192.168.108.45:8136"
+    max: 255
+    
+  # Admin Cart Management
+  admin_cart_list:
+    name: "Admin Cart List"
+    initial: "142,105"
+    max: 255
+    
+  # Cart Config Storage (JSON strings)
+  cart_new_config_142:
+    name: "Cart 142 New Config"
+    initial: "{}"
+    max: 1000
+  cart_old_config_142:
+    name: "Cart 142 Old Config"
+    initial: "{}"
+    max: 1000
+  cart_new_config_105:
+    name: "Cart 105 New Config"
+    initial: "{}"
+    max: 1000
+  cart_old_config_105:
+    name: "Cart 105 Old Config"
+    initial: "{}"
+    max: 1000
+    
+  cart_142_search_name:
+    name: "142: Search by name"
+    initial: ""
+    max: 120
+  cart_142_search_area:
+    name: "142: Search by area"
+    initial: ""
+    max: 40
+  cart_142_search_type:
+    name: "142: Search by type"
+    initial: ""
+    max: 40
+
+  cart_105_search_name:
+    name: "105: Search by name"
+    initial: ""
+    max: 120
+  cart_105_search_area:
+    name: "105: Search by area"
+    initial: ""
+    max: 40
+  cart_105_search_type:
+    name: "105: Search by type"
+    initial: ""
+    max: 40
+
+#######################################################
+# CART 142 — cart_inventory & cart_config & cart_search
+#######################################################
+sensor:
+  # --- INVENTORY SENSORS — CART 142 ---
+  - platform: rest
+    name: "Cart 142 Inventory"
+    unique_id: cart_142_inventory
+    resource_template: "{{ states('input_text.api_base') ~ '/cart_inventory/142' }}"
+    method: GET
+    scan_interval: 3600
+    timeout: 5
+    value_template: "{{ value_json.total | float(0) }}"
+    json_attributes:
+      - cart_id
+      - items
+    headers:
+      Accept: "application/json"
+
+  # --- CONFIG SENSORS — CART 142 ---
+  - platform: rest
+    name: "Cart 142 Config"
+    unique_id: cart_142_config
+    resource_template: "{{ states('input_text.api_base') ~ '/cart_infor/142' }}"
+    method: GET
+    scan_interval: 3600
+    timeout: 5
+    value_template: "{{ value_json.cart_id }}"
+    json_attributes:
+      - cart_id
+      - cam_stream_url
+      - beacon_uuid_1
+      - beacon_uuid_2
+      - beacon_uuid_3
+      - beacon_uuid_4
+      - map_id
+    headers:
+      Accept: "application/json"
+  # --- SEARCH SENSORS — CART 142 ---
+  - platform: rest
+    name: cart_142_search_by_name
+    unique_id: cart_142_search_by_name
+    resource_template: >
+      {{ states('input_text.api_base')
+         ~ '/products?name=' ~ (states('input_text.cart_142_search_name') | urlencode)
+         ~ '&limit=50' }}
+    method: GET
+    scan_interval: 3600
+    timeout: 5
+    value_template: "{{ value_json | default([], true) | length }}"
+    headers: { Accept: "application/json" }
+
+  - platform: rest
+    name: cart_142_search_by_area
+    unique_id: cart_142_search_by_area
+    resource_template: >
+      {{ states('input_text.api_base')
+         ~ '/products/by-area/' ~ (states('input_text.cart_142_search_area') | urlencode)
+         ~ '?limit=50' }}
+    method: GET
+    scan_interval: 3600
+    timeout: 5
+    value_template: "{{ value_json | default([], true) | length }}"
+    headers: { Accept: "application/json" }
+
+  - platform: rest
+    name: cart_142_search_by_type
+    unique_id: cart_142_search_by_type
+    resource_template: >
+      {{ states('input_text.api_base')
+         ~ '/products/by-type/' ~ (states('input_text.cart_142_search_type') | urlencode)
+         ~ '?limit=50' }}
+    method: GET
+    scan_interval: 3600
+    timeout: 5
+    value_template: "{{ value_json | default([], true) | length }}"
+    headers: { Accept: "application/json" }
+
+  #######################################################
+  # CART 105 — cart_inventory & cart_config & cart_search
+  #######################################################
+  # --- INVENTORY SENSORS — CART 105 ---
+  - platform: rest
+    name: "Cart 105 Inventory"
+    unique_id: cart_105_inventory
+    resource_template: "{{ states('input_text.api_base') ~ '/cart_inventory/105' }}"
+    method: GET
+    scan_interval: 3600
+    timeout: 5
+    value_template: "{{ value_json.total | float(0) }}"
+    json_attributes:
+      - cart_id
+      - items
+    headers:
+      Accept: "application/json"
+  # --- CONFIG SENSORS — CART 105 ---
+  - platform: rest
+    name: "Cart 105 Config"
+    unique_id: cart_105_config
+    resource_template: "{{ states('input_text.api_base') ~ '/cart_infor/105' }}"
+    method: GET
+    scan_interval: 3600
+    timeout: 5
+    value_template: "{{ value_json.cart_id }}"
+    json_attributes:
+      - cart_id
+      - cam_stream_url
+      - beacon_uuid_1
+      - beacon_uuid_2
+      - beacon_uuid_3
+      - beacon_uuid_4
+      - map_id
+    headers:
+      Accept: "application/json"
+  # --- SEARCH SENSORS — CART 105 ---
+  - platform: rest
+    name: cart_105_search_by_name
+    unique_id: cart_105_search_by_name
+    resource_template: >
+      {{ states('input_text.api_base')
+         ~ '/products?name=' ~ (states('input_text.cart_105_search_name') | urlencode)
+         ~ '&limit=50' }}
+    method: GET
+    scan_interval: 3600
+    timeout: 5
+    value_template: "{{ value_json | default([], true) | length }}"
+    headers: { Accept: "application/json" }
+
+  - platform: rest
+    name: cart_105_search_by_area
+    unique_id: cart_105_search_by_area
+    resource_template: >
+      {{ states('input_text.api_base')
+         ~ '/products/by-area/' ~ (states('input_text.cart_105_search_area') | urlencode)
+         ~ '?limit=50' }}
+    method: GET
+    scan_interval: 3600
+    timeout: 5
+    value_template: "{{ value_json | default([], true) | length }}"
+    headers: { Accept: "application/json" }
+
+  - platform: rest
+    name: cart_105_search_by_type
+    unique_id: cart_105_search_by_type
+    resource_template: >
+      {{ states('input_text.api_base')
+         ~ '/products/by-type/' ~ (states('input_text.cart_105_search_type') | urlencode)
+         ~ '?limit=50' }}
+    method: GET
+    scan_interval: 3600
+    timeout: 5
+    value_template: "{{ value_json | default([], true) | length }}"
+    headers: { Accept: "application/json" }
