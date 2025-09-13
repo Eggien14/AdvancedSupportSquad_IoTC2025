@@ -8,7 +8,7 @@ from typing import List, Optional, Dict, Any
 from decimal import Decimal, InvalidOperation
 from fastapi import HTTPException
 
-from .repos import ProductRepo, CartRepo, CartConfigRepo, MapBeaconRepo
+from .repos import ProductRepo, CartRepo, CartConfigRepo, MapBeaconRepo, MapRepo
 from .settings import get_settings
 
 # Simplified - use print instead of logger
@@ -350,15 +350,15 @@ class CartService:
         
         result = {
             "cart_id": cart_id,
-            "items": items,
-            "total": total,
-            "discount": discount,
-            "final_total": final_total,
+            "items": convert_decimal(items),
+            "total": float(total),
+            "discount": float(discount),
+            "final_total": float(final_total),
             "total_items": total_items,
-            "total_quantity": total_quantity
+            "total_quantity": float(total_quantity)
         }
         
-        print(f"Cart {cart_id}: {total_items} items, total: {total}, final: {final_total}")
+        # print(f"Cart {cart_id}: {total_items} items, total: {total}, final: {final_total}")
         return result
     
     @staticmethod
@@ -619,16 +619,18 @@ class CartConfigService:
         cart_position = config_data.get("cart_position")
         cart_state = config_data.get("cart_state") 
         cart_voice_cmd = config_data.get("cart_voice_cmd")
-        cart_ota = config_data.get("cart_ota")
+        cart_firmware_update = config_data.get("cart_firmware_update")
         cam_stream_url = config_data.get("cam_stream_url")
+        cart_mac_address = config_data.get("cart_mac_address")
         
         # Upsert vào database
         success = CartConfigRepo.upsert(
             cart_id=cart_id,
+            cart_mac_address=cart_mac_address,
             cart_position=cart_position,
             cart_state=cart_state,
             cart_voice_cmd=cart_voice_cmd,
-            cart_ota=cart_ota,
+            cart_firmware_update=cart_firmware_update,
             cam_stream_url=cam_stream_url
         )
         
@@ -642,6 +644,27 @@ class CartConfigService:
         
         # Trả về config mới
         return CartConfigRepo.get_by_cart_id(cart_id)
+
+    @staticmethod
+    def get_all_carts() -> List[Dict[str, Any]]:
+        """Lấy danh sách tất cả cart configs"""
+        carts = CartConfigRepo.get_all()
+        print(f"Retrieved {len(carts)} cart configs")
+        return carts
+
+    @staticmethod
+    def delete_cart(cart_id: int) -> bool:
+        """Xóa cart config theo cart_id"""
+        if cart_id <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid cart_id"
+            )
+        
+        success = CartConfigRepo.delete_by_cart_id(cart_id)
+        if success:
+            print(f"Cart config deleted for cart_id: {cart_id}")
+        return success
 
 
 class MapBeaconService:
@@ -698,7 +721,7 @@ class MapBeaconService:
             )
         
         # Extract fields từ beacon_data
-        beacon_blea_uuid = beacon_data.get("beacon_blea_uuid")
+        beacon_mac_address = beacon_data.get("beacon_mac_address")
         beacon_x_coordinate = beacon_data.get("beacon_x_coordinate")
         beacon_y_coordinate = beacon_data.get("beacon_y_coordinate")
         beacon_D0 = beacon_data.get("beacon_D0")
@@ -708,7 +731,7 @@ class MapBeaconService:
         success = MapBeaconRepo.upsert(
             map_id=map_id,
             beacon_id=beacon_id,
-            beacon_blea_uuid=beacon_blea_uuid,
+            beacon_mac_address=beacon_mac_address,
             beacon_x_coordinate=beacon_x_coordinate,
             beacon_y_coordinate=beacon_y_coordinate,
             beacon_D0=beacon_D0,
@@ -725,3 +748,195 @@ class MapBeaconService:
         
         # Trả về config mới
         return MapBeaconRepo.get_by_map_and_beacon(map_id, beacon_id)
+
+    @staticmethod
+    def delete_beacon(map_id: int, beacon_id: str) -> bool:
+        """Xóa beacon theo map_id và beacon_id"""
+        if map_id <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid map_id"
+            )
+        
+        if not beacon_id or len(beacon_id.strip()) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid beacon_id"
+            )
+        
+        success = MapBeaconRepo.delete_by_map_and_beacon(map_id, beacon_id)
+        if success:
+            print(f"Beacon deleted for map_id: {map_id}, beacon_id: {beacon_id}")
+        return success
+
+    @staticmethod
+    def delete_map(map_id: int) -> int:
+        """Xóa tất cả beacon theo map_id"""
+        if map_id <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid map_id"
+            )
+        
+        deleted_count = MapBeaconRepo.delete_by_map_id(map_id)
+        print(f"Deleted {deleted_count} beacons from map_id: {map_id}")
+        return deleted_count
+
+
+
+def convert_decimal(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {k: convert_decimal(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_decimal(i) for i in obj]
+    elif isinstance(obj, tuple):
+        return tuple(convert_decimal(i) for i in obj)
+    elif isinstance(obj, set):
+        return {convert_decimal(i) for i in obj}
+    return obj
+
+
+class MapService:
+    """
+    Map service cho quản lý bản đồ grid 10x10.
+    """
+    
+    @staticmethod
+    def get_map_cells(map_id: int) -> Dict[str, Any]:
+        """Lấy tất cả cells của map_id"""
+        cells = MapRepo.get_by_map_id(map_id)
+        
+        if not cells:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No cells found for map_id: {map_id}"
+            )
+        
+        print(f"Map cells retrieved for map_id: {map_id}, count: {len(cells)}")
+        return {
+            "map_id": map_id,
+            "cells": cells
+        }
+    
+    @staticmethod
+    def get_cell_detail(map_id: int, x_coordinate: int, y_coordinate: int) -> Dict[str, Any]:
+        """Lấy thông tin chi tiết của 1 cell cụ thể"""
+        cell = MapRepo.get_by_coordinates(map_id, x_coordinate, y_coordinate)
+        
+        if not cell:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Cell not found for map_id: {map_id}, coordinates: ({x_coordinate}, {y_coordinate})"
+            )
+        
+        print(f"Map cell retrieved: map_id={map_id}, x={x_coordinate}, y={y_coordinate}")
+        return cell
+    
+    @staticmethod  
+    def update_cell(map_id: int, x_coordinate: int, y_coordinate: int, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Cập nhật hoặc tạo mới cell"""
+        
+        # Validate coordinates
+        if not (0 <= x_coordinate <= 9 and 0 <= y_coordinate <= 9):
+            raise HTTPException(
+                status_code=400,
+                detail="Coordinates must be between 0-9 for 10x10 grid"
+            )
+        
+        # Validate map_id
+        if map_id <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Map ID must be a positive integer"
+            )
+        
+        try:
+            updated_cell = MapRepo.update_or_create(map_id, x_coordinate, y_coordinate, data)
+            print(f"Map cell updated: map_id={map_id}, x={x_coordinate}, y={y_coordinate}, area={data.get('area')}")
+            return updated_cell
+            
+        except Exception as e:
+            print(f"Error updating map cell: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to update map cell: {str(e)}"
+            )
+    
+    @staticmethod
+    def delete_map(map_id: int) -> Dict[str, Any]:
+        """Xóa tất cả cells theo map_id"""
+        if map_id <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Map ID must be a positive integer"
+            )
+        
+        try:
+            deleted_count = MapRepo.delete_by_map_id(map_id)
+            print(f"Map deleted: map_id={map_id}, cells_deleted={deleted_count}")
+            return {
+                "ok": True,
+                "message": f"Deleted {deleted_count} cells from map {map_id}",
+                "deleted_count": deleted_count
+            }
+            
+        except Exception as e:
+            print(f"Error deleting map: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete map: {str(e)}"
+            )
+    
+    @staticmethod
+    def bulk_update_cells(map_id: int, cells_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Bulk update nhiều cells cùng lúc"""
+        
+        # Validate map_id
+        if map_id <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Map ID must be a positive integer"
+            )
+        
+        # Validate cells data
+        if not cells_data:
+            raise HTTPException(
+                status_code=400,
+                detail="Cells data cannot be empty"
+            )
+        
+        # Validate each cell coordinates
+        for cell in cells_data:
+            x_coord = cell.get('x_coor')
+            y_coord = cell.get('y_coor')
+            
+            if x_coord is None or y_coord is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Each cell must have x_coor and y_coor"
+                )
+            
+            if not (0 <= x_coord <= 9 and 0 <= y_coord <= 9):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Coordinates must be between 0-9 for 10x10 grid. Invalid: ({x_coord}, {y_coord})"
+                )
+        
+        try:
+            updated_cells = MapRepo.bulk_update_cells(map_id, cells_data)
+            print(f"Bulk update completed: map_id={map_id}, cells_updated={len(updated_cells)}")
+            
+            return {
+                "map_id": map_id,
+                "updated_count": len(updated_cells),
+                "cells": updated_cells
+            }
+            
+        except Exception as e:
+            print(f"Error bulk updating cells: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to bulk update cells: {str(e)}"
+            )

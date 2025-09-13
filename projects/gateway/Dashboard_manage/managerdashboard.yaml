@@ -1,0 +1,31 @@
+views:
+  - type: panel
+    path: manager-guide
+    title: Manager guide
+    cards:
+      - type: custom:admin-easy-config-card
+  - type: panel
+    title: Product manage
+    path: product-manage
+    icon: ''
+    sections: []
+    cards:
+      - type: custom:admin-product-manage-card
+  - type: panel
+    path: cart-manage
+    title: Cart manage
+    icon: ''
+    cards:
+      - type: custom:admin-cart-config-card
+  - type: panel
+    path: map-manage
+    title: Map manage
+    icon: ''
+    cards:
+      - type: custom:admin-map-config-card
+  - type: panel
+    path: firmware-update
+    title: Firmware update
+    sections: []
+    cards:
+      - type: custom:admin-update-firmware-card

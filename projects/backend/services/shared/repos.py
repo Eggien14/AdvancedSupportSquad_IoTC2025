@@ -85,12 +85,13 @@ class ProductRepo:
           area,
           weight_kg
         FROM product_master
-        WHERE product_type = %s
+        WHERE product_type LIKE %s
         ORDER BY product_name
         LIMIT %s
         """
+        like = f"%{p_type}%"
         with get_conn() as conn, conn.cursor() as cur:
-            cur.execute(sql, (p_type, int(limit)))
+            cur.execute(sql, (like, int(limit)))
             return cur.fetchall()
 
     @staticmethod
@@ -437,10 +438,11 @@ class CartConfigRepo:
         sql = """
         SELECT 
           cart_id,
+          cart_mac_address,
           cart_position,
           cart_state, 
           cart_voice_cmd,
-          cart_ota,
+          cart_firmware_update,
           cam_stream_url
         FROM cart_config 
         WHERE cart_id = %s
@@ -451,27 +453,60 @@ class CartConfigRepo:
             return cur.fetchone()
     
     @staticmethod  
-    def upsert(cart_id: int, cart_position: str = None, cart_state: str = None, 
-               cart_voice_cmd: str = None, cart_ota: str = None, cam_stream_url: str = None) -> bool:
+    def upsert(cart_id: int, cart_mac_address: str = None, cart_position: str = None, cart_state: str = None, 
+               cart_voice_cmd: str = None, cart_firmware_update: str = None, cam_stream_url: str = None) -> bool:
         """Thêm mới hoặc cập nhật thông tin cart config"""
         sql = """
         INSERT INTO cart_config 
-        (cart_id, cart_position, cart_state, cart_voice_cmd, cart_ota, cam_stream_url)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        (cart_id, cart_mac_address, cart_position, cart_state, cart_voice_cmd, cart_firmware_update, cam_stream_url)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
+          cart_mac_address = VALUES(cart_mac_address),
           cart_position = VALUES(cart_position),
           cart_state = VALUES(cart_state), 
           cart_voice_cmd = VALUES(cart_voice_cmd),
-          cart_ota = VALUES(cart_ota),
+          cart_firmware_update = VALUES(cart_firmware_update),
           cam_stream_url = VALUES(cam_stream_url)
         """
         try:
             with get_conn() as conn, conn.cursor() as cur:
-                cur.execute(sql, (cart_id, cart_position, cart_state, cart_voice_cmd, cart_ota, cam_stream_url))
+                cur.execute(sql, (cart_id, cart_mac_address, cart_position, cart_state, cart_voice_cmd, cart_firmware_update, cam_stream_url))
                 conn.commit()
                 return True
         except Exception as e:
             print(f"Error upserting cart_config: {e}")
+            return False
+
+    @staticmethod
+    def get_all() -> List[Dict[str, Any]]:
+        """Lấy danh sách tất cả cart configs"""
+        sql = """
+        SELECT 
+          cart_id,
+          cart_mac_address,
+          cart_position,
+          cart_state, 
+          cart_voice_cmd,
+          cart_firmware_update,
+          cam_stream_url
+        FROM cart_config 
+        ORDER BY cart_id
+        """
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(sql)
+            return cur.fetchall()
+
+    @staticmethod
+    def delete_by_cart_id(cart_id: int) -> bool:
+        """Xóa cart config theo cart_id"""
+        sql = "DELETE FROM cart_config WHERE cart_id = %s"
+        try:
+            with get_conn() as conn, conn.cursor() as cur:
+                cur.execute(sql, (cart_id,))
+                conn.commit()
+                return cur.rowcount > 0
+        except Exception as e:
+            print(f"Error deleting cart_config: {e}")
             return False
 
 
@@ -485,7 +520,7 @@ class MapBeaconRepo:
         SELECT 
           map_id,
           beacon_id,
-          beacon_blea_uuid,
+          beacon_mac_address,
           beacon_x_coordinate,
           beacon_y_coordinate,
           beacon_D0,
@@ -505,7 +540,7 @@ class MapBeaconRepo:
         SELECT 
           map_id,
           beacon_id,
-          beacon_blea_uuid,
+          beacon_mac_address,
           beacon_x_coordinate,
           beacon_y_coordinate,
           beacon_D0,
@@ -519,16 +554,16 @@ class MapBeaconRepo:
             return cur.fetchone()
     
     @staticmethod
-    def upsert(map_id: int, beacon_id: str, beacon_blea_uuid: str = None,
+    def upsert(map_id: int, beacon_id: str, beacon_mac_address: str = None,
                beacon_x_coordinate: float = None, beacon_y_coordinate: float = None,
                beacon_D0: float = None, beacon_n: float = None) -> bool:
         """Insert hoặc update beacon config"""
         sql = """
         INSERT INTO map_beacon 
-        (map_id, beacon_id, beacon_blea_uuid, beacon_x_coordinate, beacon_y_coordinate, beacon_D0, beacon_n)
+        (map_id, beacon_id, beacon_mac_address, beacon_x_coordinate, beacon_y_coordinate, beacon_D0, beacon_n)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
-          beacon_blea_uuid = VALUES(beacon_blea_uuid),
+          beacon_mac_address = VALUES(beacon_mac_address),
           beacon_x_coordinate = VALUES(beacon_x_coordinate),
           beacon_y_coordinate = VALUES(beacon_y_coordinate),
           beacon_D0 = VALUES(beacon_D0),
@@ -536,9 +571,174 @@ class MapBeaconRepo:
         """
         try:
             with get_conn() as conn, conn.cursor() as cur:
-                cur.execute(sql, (map_id, beacon_id, beacon_blea_uuid, beacon_x_coordinate, beacon_y_coordinate, beacon_D0, beacon_n))
+                cur.execute(sql, (map_id, beacon_id, beacon_mac_address, beacon_x_coordinate, beacon_y_coordinate, beacon_D0, beacon_n))
                 conn.commit()
                 return True
         except Exception as e:
             print(f"Error upserting map_beacon: {e}")
             return False
+
+    @staticmethod
+    def delete_by_map_and_beacon(map_id: int, beacon_id: str) -> bool:
+        """Xóa beacon theo map_id và beacon_id"""
+        sql = "DELETE FROM map_beacon WHERE map_id = %s AND beacon_id = %s"
+        try:
+            with get_conn() as conn, conn.cursor() as cur:
+                cur.execute(sql, (map_id, beacon_id))
+                conn.commit()
+                return cur.rowcount > 0
+        except Exception as e:
+            print(f"Error deleting map_beacon: {e}")
+            return False
+
+    @staticmethod
+    def delete_by_map_id(map_id: int) -> int:
+        """Xóa tất cả beacon theo map_id, trả về số hàng đã xóa"""
+        sql = "DELETE FROM map_beacon WHERE map_id = %s"
+        try:
+            with get_conn() as conn, conn.cursor() as cur:
+                cur.execute(sql, (map_id,))
+                conn.commit()
+                return cur.rowcount
+        except Exception as e:
+            print(f"Error deleting map_beacon by map_id: {e}")
+            return 0
+
+
+class MapRepo:
+    """Repository cho map data"""
+    
+    @staticmethod
+    def get_by_map_id(map_id: int) -> List[Dict[str, Any]]:
+        """Lấy tất cả cells của map_id"""
+        sql = """
+        SELECT 
+          map_id,
+          x_coordinate,
+          y_coordinate,
+          area
+        FROM map 
+        WHERE map_id = %s
+        ORDER BY y_coordinate DESC, x_coordinate ASC
+        """
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(sql, (map_id,))
+            return cur.fetchall()
+    
+    @staticmethod
+    def get_by_coordinates(map_id: int, x_coordinate: int, y_coordinate: int) -> Optional[Dict[str, Any]]:
+        """Lấy thông tin 1 cell cụ thể"""
+        sql = """
+        SELECT 
+          map_id,
+          x_coordinate,
+          y_coordinate,
+          area
+        FROM map 
+        WHERE map_id = %s AND x_coordinate = %s AND y_coordinate = %s
+        LIMIT 1
+        """
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(sql, (map_id, x_coordinate, y_coordinate))
+            return cur.fetchone()
+    
+    @staticmethod
+    def update_or_create(map_id: int, x_coordinate: int, y_coordinate: int, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Cập nhật hoặc tạo mới map cell"""
+        try:
+            with get_conn() as conn, conn.cursor() as cur:
+                # Check if exists
+                check_sql = """
+                SELECT COUNT(*) as count 
+                FROM map 
+                WHERE map_id = %s AND x_coordinate = %s AND y_coordinate = %s
+                """
+                cur.execute(check_sql, (map_id, x_coordinate, y_coordinate))
+                exists = cur.fetchone()["count"] > 0
+                
+                if exists:
+                    # Update
+                    update_sql = """
+                    UPDATE map 
+                    SET area = %s
+                    WHERE map_id = %s AND x_coordinate = %s AND y_coordinate = %s
+                    """
+                    cur.execute(update_sql, (data.get('area'), map_id, x_coordinate, y_coordinate))
+                else:
+                    # Insert
+                    insert_sql = """
+                    INSERT INTO map (map_id, x_coordinate, y_coordinate, area)
+                    VALUES (%s, %s, %s, %s)
+                    """
+                    cur.execute(insert_sql, (map_id, x_coordinate, y_coordinate, data.get('area')))
+                
+                conn.commit()
+                
+                # Return updated data
+                return MapRepo.get_by_coordinates(map_id, x_coordinate, y_coordinate)
+                
+        except Exception as e:
+            print(f"Error updating/creating map cell: {e}")
+            raise
+    
+    @staticmethod
+    def bulk_update_cells(map_id: int, cells_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Bulk update nhiều cells cùng lúc"""
+        try:
+            with get_conn() as conn, conn.cursor() as cur:
+                updated_cells = []
+                
+                for cell in cells_data:
+                    x_coord = cell.get('x_coor')
+                    y_coord = cell.get('y_coor')
+                    area = cell.get('area')
+                    
+                    # Check if exists
+                    check_sql = """
+                    SELECT COUNT(*) as count 
+                    FROM map 
+                    WHERE map_id = %s AND x_coordinate = %s AND y_coordinate = %s
+                    """
+                    cur.execute(check_sql, (map_id, x_coord, y_coord))
+                    exists = cur.fetchone()["count"] > 0
+                    
+                    if exists:
+                        # Update
+                        update_sql = """
+                        UPDATE map 
+                        SET area = %s
+                        WHERE map_id = %s AND x_coordinate = %s AND y_coordinate = %s
+                        """
+                        cur.execute(update_sql, (area, map_id, x_coord, y_coord))
+                    else:
+                        # Insert
+                        insert_sql = """
+                        INSERT INTO map (map_id, x_coordinate, y_coordinate, area)
+                        VALUES (%s, %s, %s, %s)
+                        """
+                        cur.execute(insert_sql, (map_id, x_coord, y_coord, area))
+                    
+                    # Get updated data
+                    updated_cell = MapRepo.get_by_coordinates(map_id, x_coord, y_coord)
+                    if updated_cell:
+                        updated_cells.append(updated_cell)
+                
+                conn.commit()
+                return updated_cells
+                
+        except Exception as e:
+            print(f"Error bulk updating map cells: {e}")
+            raise
+    
+    @staticmethod
+    def delete_by_map_id(map_id: int) -> int:
+        """Xóa tất cả cells theo map_id"""
+        try:
+            with get_conn() as conn, conn.cursor() as cur:
+                sql = "DELETE FROM map WHERE map_id = %s"
+                cur.execute(sql, (map_id,))
+                conn.commit()
+                return cur.rowcount
+        except Exception as e:
+            print(f"Error deleting map by map_id: {e}")
+            return 0

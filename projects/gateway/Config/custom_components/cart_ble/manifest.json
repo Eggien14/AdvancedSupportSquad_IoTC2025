@@ -1,0 +1,9 @@
+{
+    "domain": "cart_ble",
+    "name": "Cart BLE Integration",
+    "version": "0.1.0",
+    "documentation": "https://example.com",
+    "dependencies": [],
+    "codeowners": ["@yourgithub"],
+    "requirements": ["bleak>=0.20.2"]
+}

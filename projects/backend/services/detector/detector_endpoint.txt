@@ -1,80 +1,137 @@
-# =========================================
-# services/detector/api_endpoint.txt
-# Tài liệu endpoint Detector (copy dùng nhanh cho QA/DevOps)
-# =========================================
+# Detector Service API Endpoints
+# Smart Shopping Cart System - IoT Challenge 2025
+# Team: Advanced Support Squad
+# Organized by: FPT Software & Silicon Labs
 
-# ====== BASE URL ======
-# Localhost : http://localhost:8100
-# LAN       : http://<HOST_IP>:8100
-# Health    : http://<BASE>/healthz
+# ==================================================
+# BASE CONFIGURATION
+# ==================================================
+BASE_URL=http://localhost:8100
+API_PREFIX=/api/v1
 
-# I) SỨC KHOẺ DỊCH VỤ
-# --------------------
-# [GET] /healthz
-# 200 -> {"status":"ok"}
+# ==================================================
+# ENDPOINT SPECIFICATIONS
+# ==================================================
 
-# II) ẢNH XỬ LÝ (JPEG)
-# ---------------------
-# [GET] /image?cart_id=<int>
-# - Trả JPEG khung hình MỚI NHẤT đã được vẽ bbox/nhãn/FPS.
-# - Header: Cache-Control: no-store
-# - 200 -> image/jpeg
-# - 404 -> chưa có ảnh cho cart_id (ví dụ camera chưa sẵn sàng)
-#
-# Ví dụ:
-#   curl -o latest.jpg "http://localhost:8100/image?cart_id=142"
-#   # Trên LAN:
-#   curl -o latest.jpg "http://192.168.1.50:8100/image?cart_id=142"
+# 1. Health Check Endpoint
+# GET /healthz
+# Purpose: Verify service status and availability
+# Response: {"status": "healthy", "service": "detector"}
 
-# III) TỒN KHO PHÁT HIỆN (INVENTORY)
-# -----------------------------------
-# [GET] /inventory?cart_id=<int>
-# - Trả JSON hiện trạng nhận diện theo cart: list {product_id, quantity}.
-# - Cập nhật mỗi chu kỳ detect (mặc định 7 khung).
-# - 200 -> {
-#            "cart_id": 142,
-#            "updated_at": "2025-08-20T09:30:01.234567+00:00",
-#            "items": [
-#              {"product_id": 6, "quantity": 1},
-#              {"product_id": 1, "quantity": 2}
-#            ]
-#          }
-#
-# Ví dụ:
-#   curl "http://localhost:8100/inventory?cart_id=142"
-#   curl "http://192.168.1.50:8100/inventory?cart_id=142"
+curl -X GET "http://localhost:8100/healthz"
 
-# IV) CÁCH TRUY CẬP & LẤY DỮ LIỆU
-# --------------------------------
-# A) Trình duyệt (GET)
-#    - http://localhost:8100/healthz
-#    - http://localhost:8100/image?cart_id=142
-#    - http://localhost:8100/inventory?cart_id=142
-#
-# B) cURL nhanh (bash)
-#    - Health:
-#        curl http://localhost:8100/healthz
-#    - Tải ảnh:
-#        curl -o f.jpg "http://localhost:8100/image?cart_id=142"
-#    - Lấy inventory:
-#        curl "http://localhost:8100/inventory?cart_id=142"
-#
-# C) cURL nhanh (PowerShell/Windows - dùng ^ xuống dòng)
-#    curl "http://localhost:8100/inventory?cart_id=142"
-#
-# D) Từ máy khác cùng mạng (LAN)
-#    - Dùng IP máy chạy detector: http://<HOST_IP>:8100/...
-#    - Nếu không truy cập được: mở firewall cổng 8100 (TCP) trên máy chạy dịch vụ và kiểm tra port mapping Docker.
+# 2. Real-time Image Detection
+# POST /api/v1/image
+# Purpose: Detect objects in uploaded image using YOLOv8
+# Content-Type: multipart/form-data
+# Parameters:
+#   - file: Image file (JPG, PNG, JPEG)
+#   - confidence: Detection confidence threshold (0.0-1.0, default: 0.5)
 
-# V) MÃ LỖI PHỔ BIẾN
-# ------------------
-# - 200 OK                : thành công
-# - 404 Not Found         : /image chưa có khung hình cho cart, kiểm tra stream/camera
-# - 500 Internal Server Error: lỗi nội bộ (xem log container)
+curl -X POST "http://localhost:8100/api/v1/image" \
+  -F "file=@/path/to/image.jpg" \
+  -F "confidence=0.7"
 
-# VI) GHI CHÚ TRIỂN KHAI
-# ----------------------
-# - Port listen: 8100 trong container; map ra host "8100:8100".
-# - MODEL_PATH: có thể trỏ tới model khác qua ENV (vd bind mount models/).
-# - CARTS: chỉnh trong config.py (cart_id, source); deploy nhiều camera -> thêm dòng trong danh sách.
-# - Bảo mật: dịch vụ cấp dữ liệu thô trong LAN; nếu public, đặt reverse proxy + TLS; hạn chế truy cập theo IP/VPN.
+# 3. Inventory Detection Analysis
+# POST /api/v1/inventory
+# Purpose: Analyze inventory items from image with detailed metadata
+# Content-Type: multipart/form-data
+# Parameters:
+#   - file: Image file (JPG, PNG, JPEG)
+#   - confidence: Detection confidence threshold (0.0-1.0, default: 0.5)
+#   - include_metadata: Include detection metadata (true/false, default: false)
+
+curl -X POST "http://localhost:8100/api/v1/inventory" \
+  -F "file=@/path/to/inventory.jpg" \
+  -F "confidence=0.6" \
+  -F "include_metadata=true"
+
+# ==================================================
+# RESPONSE FORMATS
+# ==================================================
+
+# Health Check Response:
+# {
+#   "status": "healthy",
+#   "service": "detector",
+#   "timestamp": "2025-09-13T10:00:00Z"
+# }
+
+# Image Detection Response:
+# {
+#   "success": true,
+#   "detections": [
+#     {
+#       "class": "product_name",
+#       "confidence": 0.85,
+#       "bbox": [x1, y1, x2, y2]
+#     }
+#   ],
+#   "processing_time": 0.234
+# }
+
+# Inventory Analysis Response:
+# {
+#   "success": true,
+#   "inventory_items": [
+#     {
+#       "product_id": "PROD001",
+#       "class": "product_name",
+#       "confidence": 0.85,
+#       "bbox": [x1, y1, x2, y2],
+#       "metadata": {
+#         "detection_time": "2025-09-13T10:00:00Z",
+#         "model_version": "yolov8n",
+#         "processing_method": "cpu"
+#       }
+#     }
+#   ],
+#   "total_items": 1,
+#   "processing_time": 0.456
+# }
+
+# ==================================================
+# ERROR RESPONSES
+# ==================================================
+
+# File Upload Error:
+# {
+#   "success": false,
+#   "error": "Invalid file format. Supported: JPG, PNG, JPEG",
+#   "code": "INVALID_FILE_FORMAT"
+# }
+
+# Processing Error:
+# {
+#   "success": false,
+#   "error": "Detection processing failed",
+#   "code": "PROCESSING_ERROR"
+# }
+
+# ==================================================
+# USAGE EXAMPLES
+# ==================================================
+
+# Example 1: Quick detection test
+curl -X GET "http://localhost:8100/healthz"
+
+# Example 2: Detect objects in product image
+curl -X POST "http://localhost:8100/api/v1/image" \
+  -F "file=@product_sample.jpg" \
+  -F "confidence=0.8"
+
+# Example 3: Full inventory analysis with metadata
+curl -X POST "http://localhost:8100/api/v1/inventory" \
+  -F "file=@shelf_inventory.jpg" \
+  -F "confidence=0.7" \
+  -F "include_metadata=true"
+
+# ==================================================
+# NOTES
+# ==================================================
+# - Service runs on port 8100 by default
+# - Supports concurrent processing with multi-threading
+# - YOLOv8 model optimized for CPU inference
+# - Maximum file size: 10MB per image
+# - Supported formats: JPG, JPEG, PNG
+# - Confidence threshold range: 0.0 to 1.0

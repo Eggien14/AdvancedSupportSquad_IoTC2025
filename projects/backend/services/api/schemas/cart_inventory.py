@@ -53,6 +53,7 @@ class CartItem(BaseModel):
     name: str
     quantity: Decimal = Field(ge=0, description="Số lượng trong giỏ (decimal hỗ trợ cả đơn vị và khối lượng)")
     price: Decimal = Field(ge=0)
+    weight_kg: Decimal | None = Field(default=None, description="Trọng lượng (kg)")
     subtotal: Decimal = Field(ge=0)
     model_config = ConfigDict(from_attributes=True)
 

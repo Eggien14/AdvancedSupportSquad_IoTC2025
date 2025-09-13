@@ -1,788 +1,377 @@
-﻿# =========================================
-# services/api/api_endpoint.txt
-# Tài liệu API Endpoints - Advanced Support Squad v2.1
-# IoT Cart Management System
-# =========================================
-
-# ====== BASE URL ======
-# Development: http://localhost:8136
-# LAN Access : http://<HOST_IP>:8136
-# Swagger UI : http://localhost:8136/docs
-# Health     : http://localhost:8136/healthz
-
-# =========================================
-# I. HEALTH CHECK
-# =========================================
-
-## [GET] /healthz
-**Mục đích:** Kiểm tra trạng thái sống của API service
-
-**Request:** 
-GET /healthz
-
-**Response:** 200 OK
-```json
-{
-  "status": "ok"
-}
-```
-
-# =========================================
-# II. QUẢN LÝ GIỎ HÀNG & KHO (CART INVENTORY)
-# =========================================
-
-## [POST] /cart_inventory/{cart_id}/items
-**Mục đích:** Cập nhật giỏ hàng với đồng bộ inventory tự động
-**Đặc biệt:** Tự động xóa items có quantity=0, cập nhật kho product_master.quantity
-
-### Mode 1: REPLACE - Thay thế toàn bộ giỏ hàng
-**Request:**
-POST /cart_inventory/142/items
-Content-Type: application/json
-
-```json
-{
-  "mode": "replace",
-  "items": [
-    {
-      "product_id": 1,
-      "quantity": 2
-    },
-    {
-      "product_id": 6,
-      "quantity": 1
-    }
-  ]
-}
-```
-
-**Response:** 200 OK
-```json
-{
-  "ok": true,
-  "mode": "replace",
-  "items_count": 2,
-  "message": "Cart replaced successfully. Inventory updated."
-}
-```
-
-### Mode 2: MERGE - Cập nhật từng phần, giữ nguyên items khác
-**Request:**
-POST /cart_inventory/142/items
-Content-Type: application/json
-
-```json
-{
-  "mode": "merge",
-  "items": [
-    {
-      "product_id": 1,
-      "quantity": 3
-    }
-  ]
-}
-```
-
-**Response:** 200 OK
-```json
-{
-  "ok": true,
-  "mode": "merge",
-  "items_count": 1,
-  "message": "Cart merged successfully. Inventory updated."
-}
-```
-
-### Mode 3: DELTA - Thay đổi theo số lượng +/-
-**Request:**
-POST /cart_inventory/142/items
-Content-Type: application/json
-
-```json
-{
-  "mode": "delta",
-  "changes": [
-    {
-      "product_id": 1,
-      "delta": -1
-    },
-    {
-      "product_id": 3,
-      "delta": 2
-    }
-  ]
-}
-```
-
-**Response:** 200 OK
-```json
-{
-  "ok": true,
-  "mode": "delta",
-  "items_count": 2,
-  "message": "Cart delta applied successfully. Inventory updated."
-}
-```
-
-**Error Responses:**
-- 400 Bad Request: cart_id < 1, mode không hỗ trợ, product_id không tồn tại
-- 422 Unprocessable Entity: Schema validation lỗi
-
-## [GET] /cart_inventory/{cart_id}
-**Mục đích:** Xem chi tiết giỏ hàng với thông tin sản phẩm và tổng tiền
-
-**Request:**
-GET /cart_inventory/142
-
-**Response:** 200 OK
-```json
-{
-  "cart_id": 142,
-  "items": [
-    {
-      "product_id": 1,
-      "name": "Vở Hồng Hà",
-      "quantity": 2,
-      "price": 12000,
-      "subtotal": 24000
-    },
-    {
-      "product_id": 6,
-      "name": "Bút bi Thiên Long",
-      "quantity": 1,
-      "price": 5000,
-      "subtotal": 5000
-    }
-  ],
-  "total": 29000
-}
-```
-
-**Error Responses:**
-- 400 Bad Request: cart_id < 1
-
-
-# =========================================
-# III. QUẢN LÝ SẢN PHẨM & KHO (PRODUCTS)
-# =========================================
-
-## [GET] /products/{product_id}
-**Mục đích:** Lấy chi tiết đầy đủ của một sản phẩm bao gồm thông tin kho
-
-**Request:**
-GET /products/1
-
-**Response:** 200 OK
-```json
-{
-  "product_id": 1,
-  "name": "Vở Hồng Hà",
-  "price": 12000,
-  "quantity": 47,
-  "type": "stationery",
-  "area": "A1-Shelf2",
-  "weight_kg": 0.15,
-  "manufacturer": "Thiên Long",
-  "expiry_or_mfg_date": "2025-12-31",
-  "origin": "Vietnam",
-  "info1": "Vở kẻ ngang 200 trang",
-  "info2": "Giấy cao cấp",
-  "detail1": "Bìa cứng chống thấm",
-  "detail2": "Phù hợp học sinh tiểu học"
-}
-```
-
-**Error Responses:**
-- 404 Not Found: Sản phẩm không tồn tại
-
-## [GET] /products?name={text}&limit={number}
-**Mục đích:** Tìm kiếm sản phẩm theo tên (LIKE search)
-
-**Request:**
-GET /products?name=vở&limit=5
-
-**Response:** 200 OK
-```json
-[
-  {
-    "product_id": 1,
-    "name": "Vở Hồng Hà",
-    "price": 12000,
-    "quantity": 47,
-    "weight_kg": 0.15
-  },
-  {
-    "product_id": 15,
-    "name": "Vở ô ly Campus",
-    "price": 8000,
-    "quantity": 23,
-    "weight_kg": 0.12
-  }
-]
-```
-
-## [GET] /products/by-area/{area}?limit={number}
-**Mục đích:** Liệt kê sản phẩm theo khu vực kho
-
-**Request:**
-GET /products/by-area/A1?limit=3
-
-**Response:** 200 OK
-```json
-[
-  {
-    "product_id": 1,
-    "name": "Vở Hồng Hà",
-    "price": 12000,
-    "quantity": 47,
-    "type": "stationery",
-    "area": "A1-Shelf2",
-    "weight_kg": 0.15
-  },
-  {
-    "product_id": 3,
-    "name": "Bút chì 2B",
-    "price": 3000,
-    "quantity": 89,
-    "type": "stationery",
-    "area": "A1-Shelf1",
-    "weight_kg": 0.05
-  }
-]
-```
-
-## [GET] /products/list-all-product
-**Mục đích:** Trả lại toàn bộ danh sách sản phẩm (chỉ ID và name cho gọn)
-
-**Request:**
-GET /products/list-all-product
-
-**Response:** 200 OK
-```json
-[
-  {
-    "product_id": 1,
-    "name": "Mì Hảo Hảo mì xào tôm chua"
-  },
-  {
-    "product_id": 2,
-    "name": "Bim bim POCA gà quay da giòn"
-  },
-  {
-    "product_id": 3,
-    "name": "Bim bim Oishi snack bắp ngọt"
-  },
-  {
-    "product_id": 4,
-    "name": "Bánh mỳ Kinh Đô vị lá dứa"
-  },
-  {
-    "product_id": 5,
-    "name": "Bia Tiger xanh"
-  }
-]
-```
-
-**Đặc điểm:**
-- Không có limit, trả về toàn bộ danh sách
-- Chỉ trả về ID và name để tối ưu bandwidth
-- Phù hợp cho dropdown lists, cache client-side
-
-## [POST] /products/update-product/{product_id}
-**Mục đích:** Cập nhật hoặc tạo mới sản phẩm
-
-### Trường hợp 1: Tạo mới sản phẩm (product_id chưa tồn tại)
-**Request:**
-POST /products/update-product/999
-Content-Type: application/json
-
-```json
-{
-  "product_name": "Nước ngọt Coca Cola 330ml",
-  "product_type": "drink", 
-  "area": "QL10",
-  "price": 12000.50,
-  "quantity": 100,
-  "weight_kg": 0.33,
-  "manufacturer": "Coca-Cola Việt Nam",
-  "origin": "Việt Nam",
-  "info1": "Lon 330ml",
-  "info2": "Có gas",
-  "detail1": "Nước giải khát có ga vị cola truyền thống",
-  "detail2": "Uống mát ngon hơn khi ướp lạnh"
-}
-```
-
-**Response:** 200 OK (Trả về ProductDetail đầy đủ)
-```json
-{
-  "product_id": 16,
-  "name": "Nước ngọt Coca Cola 330ml",
-  "price": "12000.50",
-  "quantity": 100,
-  "weight_kg": "0.330",
-  "type": "drink",
-  "area": "QL10",
-  "manufacturer": "Coca-Cola Việt Nam",
-  "expiry_or_mfg_date": null,
-  "origin": "Việt Nam",
-  "info1": "Lon 330ml",
-  "info2": "Có gas",
-  "detail1": "Nước giải khát có ga vị cola truyền thống",
-  "detail2": "Uống mát ngon hơn khi ướp lạnh"
-}
-```
-
-### Trường hợp 2: Cập nhật sản phẩm hiện có 
-**Request:**
-POST /products/update-product/6
-Content-Type: application/json
-
-```json
-{
-  "product_name": "Sữa Milo lốc 4 hộp - Khuyến mãi",
-  "product_type": "drink",
-  "area": "QL10", 
-  "price": 45000.00,
-  "quantity": 50,
-  "weight_kg": 0.72,
-  "manufacturer": "Nestlé Việt Nam (MILO)",
-  "origin": "Việt Nam",
-  "info1": "Thể tích-180ml x4 - Khuyến mãi",
-  "info2": "",
-  "detail1": "MILO UHT bổ sung Protomalt, canxi, vitamin - Giá ưu đãi",
-  "detail2": null
-}
-```
-
-**Response:** 200 OK
-```json
-{
-  "product_id": 6,
-  "name": "Sữa Milo lốc 4 hộp - Khuyến mãi", 
-  "price": "45000.00",
-  "quantity": 50,
-  "weight_kg": "0.720",
-  "type": "drink",
-  "area": "QL10",
-  "manufacturer": "Nestlé Việt Nam (MILO)",
-  "expiry_or_mfg_date": null,
-  "origin": "Việt Nam",
-  "info1": "Thể tích-180ml x4 - Khuyến mãi",
-  "info2": null,
-  "detail1": "MILO UHT bổ sung Protomalt, canxi, vitamin - Giá ưu đãi",
-  "detail2": null
-}
-```
-
-**Validation Rules:**
-- **Required fields**: product_name, product_type, price, quantity
-- **Optional fields**: Tất cả các trường khác, có thể null hoặc rỗng
-- **Empty string handling**: Chuỗi rỗng `""` được convert thành `null`
-- **Data types**: price >= 0, quantity >= 0, weight_kg >= 0
-
-**Error Responses:**
-- 400 Bad Request: Missing required fields, invalid data types
-- 500 Internal Server Error: Database errors
-
-## [POST] /products/delete-product/{product_id}
-**Mục đích:** Xóa sản phẩm theo ID
-
-**Request:**
-POST /products/delete-product/16
-
-**Response:** 200 OK
-```json
-{
-  "message": "Product with ID 16 deleted successfully",
-  "deleted_product_id": 16,
-  "deleted_product_name": "Nước ngọt Coca Cola 330ml"
-}
-```
-
-**Error Responses:**
-- 400 Bad Request: product_id <= 0
-- 404 Not Found: Sản phẩm không tồn tại
-- 500 Internal Server Error: Database errors
-
-**Lưu ý:**
-- Kiểm tra ràng buộc foreign key trước khi xóa
-- Xóa vĩnh viễn, không có soft delete
-- Trả về thông tin sản phẩm đã xóa để confirm
-
-## [GET] /products/by-type/{product_type}?limit={number}
-**Mục đích:** Liệt kê sản phẩm theo loại (food/drink/household/stationery)
-
-**Request:**
-GET /products/by-type/food?limit=2
-
-**Response:** 200 OK
-```json
-[
-  {
-    "product_id": 1,
-    "name": "Mì Hảo Hảo mì xào tôm chua",
-    "price": "0.00",
-    "quantity": 999,
-    "type": "food",
-    "area": "TK14",
-    "weight_kg": "0.075"
-  },
-  {
-    "product_id": 2,
-    "name": "Bim bim POCA gà quay da giòn",
-    "price": "0.00", 
-    "quantity": 999,
-    "type": "food",
-    "area": "TK14",
-    "weight_kg": "0.065"
-  }
-]
-```
-
-
-# =========================================
-# IV. CẤU HÌNH CART IOT (CART CONFIG)
-# =========================================
-
-## [GET] /cart_infor/{cart_id}
-**Mục đích:** Lấy cấu hình BLE UUID và camera stream cho IoT gateway
-
-**Request:**
-GET /cart_infor/142
-
-**Response:** 200 OK
-```json
-{
-  "cart_id": 142,
-  "cart_position": "f7826da6-4fa2-4e98-8024-bc5b71e0893e",
-  "cart_state": "f7826da6-4fa2-4e98-8024-bc5b71e0893f",
-  "cart_voice_cmd": "f7826da6-4fa2-4e98-8024-bc5b71e08940",
-  "cart_ota": "f7826da6-4fa2-4e98-8024-bc5b71e08941",
-  "cam_stream_url": "rtsp://192.168.1.100:554/stream"
-}
-```
-
-## [POST] /cart_infor/{cart_id}
-**Mục đích:** Cập nhật cấu hình BLE UUIDs và camera cho cart (UPSERT)
-
-**Request:**
-POST /cart_infor/142
-Content-Type: application/json
-
-```json
-{
-  "cart_position": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "cart_state": "b2c3d4e5-f6g7-8901-bcde-f23456789012",
-  "cart_voice_cmd": "c3d4e5f6-g7h8-9012-cdef-345678901234",
-  "cart_ota": "d4e5f6g7-h8i9-0123-def0-456789012345",
-  "cam_stream_url": "rtsp://192.168.1.200:554/new-stream"
-}
-```
-
-**Response:** 200 OK
-```json
-{
-  "cart_id": 142,
-  "cart_position": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "cart_state": "b2c3d4e5-f6g7-8901-bcde-f23456789012",
-  "cart_voice_cmd": "c3d4e5f6-g7h8-9012-cdef-345678901234",
-  "cart_ota": "d4e5f6g7-h8i9-0123-def0-456789012345",
-  "cam_stream_url": "rtsp://192.168.1.200:554/new-stream"
-}
-```
-
-**Lưu ý:**
-- Tất cả fields trong request body đều optional
-- Chỉ cần gửi những fields muốn cập nhật
-- UUIDs phải đúng format UUID v4 (36 ký tự)
-
-
-# =========================================
-# V. QUẢN LÝ BEACON ĐỊNH VỊ (MAP BEACON)
-# =========================================
-
-## [GET] /map_beacon/{map_id}
-**Mục đích:** Lấy tất cả beacons trong một map cho hệ thống định vị
-
-**Request:**
-GET /map_beacon/510
-
-**Response:** 200 OK
-```json
-{
-  "map_id": 510,
-  "beacons": [
-    {
-      "beacon_id": "01",
-      "beacon_blea_uuid": "f7826da6-4fa2-4e98-8024-bc5b71e0893e",
-      "beacon_x_coordinate": 0.0,
-      "beacon_y_coordinate": 0.0,
-      "beacon_D0": -60.0,
-      "beacon_n": 1.8
-    },
-    {
-      "beacon_id": "02", 
-      "beacon_blea_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-      "beacon_x_coordinate": 10.5,
-      "beacon_y_coordinate": 0.0,
-      "beacon_D0": -62.0,
-      "beacon_n": 2.0
-    },
-    {
-      "beacon_id": "03",
-      "beacon_blea_uuid": "b2c3d4e5-f6g7-8901-bcde-f23456789012", 
-      "beacon_x_coordinate": 5.25,
-      "beacon_y_coordinate": 8.7,
-      "beacon_D0": -58.5,
-      "beacon_n": 1.9
-    }
-  ]
-}
-```
-
-## [GET] /map_beacon/{map_id}/{beacon_id}
-**Mục đích:** Lấy cấu hình chi tiết của một beacon cụ thể
-
-**Request:**
-GET /map_beacon/510/01
-
-**Response:** 200 OK
-```json
-{
-  "beacon_id": "01",
-  "beacon_blea_uuid": "f7826da6-4fa2-4e98-8024-bc5b71e0893e",
-  "beacon_x_coordinate": 0.0,
-  "beacon_y_coordinate": 0.0,
-  "beacon_D0": -60.0,
-  "beacon_n": 1.8
-}
-```
-
-## [POST] /map_beacon/{map_id}/{beacon_id}
-**Mục đích:** Cập nhật cấu hình beacon (UPSERT operation)
-
-**Request:**
-POST /map_beacon/510/04
-Content-Type: application/json
-
-```json
-{
-  "beacon_blea_uuid": "d4e5f6g7-h8i9-0123-def0-456789012345",
-  "beacon_x_coordinate": 15.75,
-  "beacon_y_coordinate": 12.3,
-  "beacon_D0": -65.5,
-  "beacon_n": 2.2
-}
-```
-
-**Response:** 200 OK
-```json
-{
-  "ok": true,
-  "message": "Beacon configuration updated successfully",
-  "map_id": 510,
-  "beacon_id": "04",
-  "beacon_config": {
-    "beacon_blea_uuid": "d4e5f6g7-h8i9-0123-def0-456789012345",
-    "beacon_x_coordinate": 15.75,
-    "beacon_y_coordinate": 12.3,
-    "beacon_D0": -65.5,
-    "beacon_n": 2.2
-  }
-}
-```
-
-**Thông số Beacon:**
-- `beacon_blea_uuid`: UUID của BLE beacon
-- `beacon_x_coordinate`: Tọa độ X trong map (meters)
-- `beacon_y_coordinate`: Tọa độ Y trong map (meters) 
-- `beacon_D0`: RSSI tại khoảng cách 1m (dBm, thường âm)
-- `beacon_n`: Path loss exponent (1.0-4.0, thường 1.8-2.2)
-
-
-# =========================================
-# VI. CÁCH SỬ DỤNG & VÍ DỤ THỰC TẾ
-# =========================================
-
-## A. Truy cập qua Browser (GET requests)
-```
-http://localhost:8136/docs                    # Swagger UI documentation
-http://localhost:8136/healthz                 # Health check
-http://localhost:8136/products?name=vở&limit=5 # Tìm sản phẩm
-http://localhost:8136/cart_inventory/142       # Xem giỏ hàng
-http://localhost:8136/cart_infor/142           # Xem config cart
-http://localhost:8136/map_beacon/510           # Xem beacons trong map
-```
-
-## B. cURL Examples (Command Line)
-
-### Health Check
-```bash
-curl http://localhost:8136/healthz
-```
-
-### Xem giỏ hàng
-```bash
-curl http://localhost:8136/cart_inventory/142
-```
-
-### Cập nhật giỏ hàng (Replace mode)
-```bash
-curl -X POST http://localhost:8136/cart_inventory/142/items \
-     -H "Content-Type: application/json" \
-     -d '{
-       "mode": "replace",
-       "items": [
-         {"product_id": 1, "quantity": 2},
-         {"product_id": 6, "quantity": 1}
-       ]
-     }'
-```
-
-### Cập nhật giỏ hàng (Delta mode)
-```bash
-curl -X POST http://localhost:8136/cart_inventory/142/items \
-     -H "Content-Type: application/json" \
-     -d '{
-       "mode": "delta", 
-       "changes": [
-         {"product_id": 1, "delta": -1},
-         {"product_id": 3, "delta": 2}
-       ]
-     }'
-```
-
-### Cập nhật cart config
-```bash
-curl -X POST http://localhost:8136/cart_infor/142 \
-     -H "Content-Type: application/json" \
-     -d '{
-       "cart_position": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-       "cam_stream_url": "rtsp://192.168.1.200:554/stream"
-     }'
-```
-
-## C. PowerShell Examples (Windows)
-
-### Xem giỏ hàng
-```powershell
-Invoke-RestMethod -Uri "http://localhost:8136/cart_inventory/142" -Method GET
-```
-
-### Cập nhật giỏ hàng
-```powershell
-$body = @{
-    mode = "merge"
-    items = @(
-        @{ product_id = 1; quantity = 3 }
-    )
-} | ConvertTo-Json -Depth 3
-
-Invoke-RestMethod -Uri "http://localhost:8136/cart_inventory/142/items" `
-                  -Method POST `
-                  -ContentType "application/json" `
-                  -Body $body
-```
-
-## D. Truy cập từ LAN (Other machines)
-```
-http://192.168.1.50:8136/products?name=pen
-http://192.168.1.50:8136/cart_inventory/142
-```
-**Lưu ý:** Cần mở firewall port 8136 (TCP) trên máy chạy API
-
-
-# =========================================
-# VII. LOGIC QUẢN LÝ KHO THÔNG MINH
-# =========================================
-
-## Replace Mode
-1. Lấy tất cả items hiện tại trong cart
-2. Tính delta: `old_quantity - new_quantity` 
-3. Trả về kho: `inventory += delta_positive`
-4. Lấy từ kho: `inventory -= delta_negative`
-5. Thay thế toàn bộ cart bằng items mới
-
-## Merge Mode  
-1. Cập nhật từng product riêng lẻ
-2. Tính delta: `old_cart_qty - new_cart_qty`
-3. Cập nhật inventory tương ứng
-4. Chỉ ảnh hưởng những products được specify
-
-## Delta Mode (Đặc biệt)
-1. Nếu `delta > 0`: Thêm vào cart, lấy từ kho `inventory -= delta`
-2. Nếu `delta < 0`: Bỏ khỏi cart, nhưng chỉ trả về đúng số có trong cart
-   - VD: Cart có 3, delta -4  chỉ trả về 3 vào kho, cart về 0
-3. Inventory luôn `>= 0` (dùng `GREATEST(0, quantity + delta)`)
-
-## Auto Cleanup
-- Tự động xóa `cart_items` có `quantity = 0`
-- Không để items "ma" trong database
-
-# =========================================
-# VIII. MÃ LỖI & TROUBLESHOOTING
-# =========================================
-
-## HTTP Status Codes
-- **200 OK**: Thành công
-- **400 Bad Request**: Tham số không hợp lệ, cart_id < 1, product_id không tồn tại
-- **404 Not Found**: Không tìm thấy resource (product, cart, beacon)
-- **422 Unprocessable Entity**: Schema validation lỗi (mode vs fields không khớp)
-- **500 Internal Server Error**: Lỗi server, kiểm tra logs
-
-## Common Issues
-1. **CORS Error**: Bật CORS middleware trong server.py (development only)
-2. **Database Connection**: Kiểm tra ENV variables và MySQL service
-3. **Invalid UUID**: UUID phải đúng format v4 (36 characters với dashes)
-4. **Inventory Mismatch**: Review delta calculation logic
-
-## Testing CORS (Browser F12 Console)
-```javascript
-fetch("http://localhost:8136/products/1")
-  .then(r => r.ok ? r.json() : Promise.reject(`${r.status} ${r.statusText}`))
-  .then(data => console.log("Success:", data))
-  .catch(err => console.error("Error:", err));
-```
-
-# =========================================
-# IX. FEATURES MỚI V2.1
-# =========================================
-
-## **V2.1 - New Product Management APIs**
- **GET /products/list-all-product**: Tất cả sản phẩm với ID + name only  
- **POST /products/update-product/{id}**: UPSERT operation với smart validation
- **POST /products/delete-product/{id}**: Xóa sản phẩm với safety checks
- **UTF8MB4 Support**: Vietnamese characters trong database và API responses
- **Enhanced Validation**: Required vs optional fields, empty string → null handling
-
-## **V2.0 - Core Features**  
- **Inventory Management**: Tự động đồng bộ kho khi thao tác giỏ hàng
- **IoT Integration**: Cart config với BLE UUIDs cho gateway  
- **Beacon Positioning**: Map beacon management cho indoor navigation
- **Smart Delta Logic**: Xử lý delta âm thông minh không gây lỗi kho
- **Auto Cleanup**: Tự động xóa items có quantity = 0
- **Enhanced Schemas**: Product với quantity field, unified response format
- **UPSERT Operations**: Cart config và beacon với ON DUPLICATE KEY UPDATE
- **Type Safety**: Discriminated union schemas với Pydantic V2
-
-# =========================================
-# X. GHI CHÚ TRIỂN KHAI
-# =========================================
-
-## Development
-- CORS enabled cho localhost development
-- No authentication (LAN only)
-- Database credentials trong environment variables
-
-## Production Considerations  
-- **Authentication**: JWT tokens hoặc API keys
-- **HTTPS**: Reverse proxy với TLS certificates (Nginx/Caddy)
-- **Rate Limiting**: Upstream rate limiting
-- **Database**: User restrictions, SSL connections  
-- **CORS**: Specific origin whitelist
-- **Firewall**: Port restrictions, VPN access only
-
----
-**Advanced Support Squad - IoT Cart Management System v2.1**
-*Built with FastAPI + MySQL + Docker - Now with Vietnamese Support*
+# API Service Endpoints Reference
+# Smart Shopping Cart System - IoT Challenge 2025
+# Team: Advanced Support Squad
+# Organized by: FPT Software & Silicon Labs
+
+# ==================================================
+# BASE CONFIGURATION
+# ==================================================
+BASE_URL=http://localhost:8136
+API_PREFIX=/api/v1
+
+# ==================================================
+# HEALTH CHECK
+# ==================================================
+
+# Health Check
+# GET /healthz
+# Purpose: Verify API service status and database connectivity
+# Response: {"status": "healthy", "timestamp": "2025-09-13T10:00:00Z"}
+
+curl -X GET "http://localhost:8136/healthz"
+
+# ==================================================
+# PRODUCT MANAGEMENT ENDPOINTS
+# ==================================================
+
+# 1. List All Products (Simple)
+# GET /products/list-all-product
+# Purpose: Get all products with minimal info (ID + name only)
+# Response: [{"product_id": 1, "name": "Product Name"}]
+
+curl -X GET "http://localhost:8136/products/list-all-product"
+
+# 2. Search Products
+# GET /products?name={search_term}&limit={count}
+# Purpose: Search products by name with optional limit
+# Parameters:
+#   - name: Search term (optional)
+#   - limit: Result limit (default: 50)
+
+curl -X GET "http://localhost:8136/products?name=milk&limit=20"
+
+# 3. Get Product Detail
+# GET /products/{product_id}
+# Purpose: Get complete product information including metadata
+# Response: Full product details with type, area, manufacturer, etc.
+
+curl -X GET "http://localhost:8136/products/1"
+
+# 4. Get Products by Area
+# GET /products/by-area/{area}?limit={count}
+# Purpose: Filter products by store area/section
+# Parameters:
+#   - area: Store area name
+#   - limit: Result limit (default: 50)
+
+curl -X GET "http://localhost:8136/products/by-area/dairy?limit=30"
+
+# 5. Get Products by Type
+# GET /products/by-type/{product_type}?limit={count}
+# Purpose: Filter products by category/type
+# Parameters:
+#   - product_type: Product category
+#   - limit: Result limit (default: 50)
+
+curl -X GET "http://localhost:8136/products/by-type/beverage?limit=25"
+
+# 6. Update Product
+# POST /products/update-product/{product_id}
+# Purpose: Update existing product details
+# Content-Type: application/json
+# Body: ProductUpdate schema with all product fields
+
+curl -X POST "http://localhost:8136/products/update-product/1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "product_name": "Updated Product Name",
+    "product_type": "food",
+    "area": "grocery",
+    "price": 15.99,
+    "quantity": 100.0,
+    "weight_kg": 0.5
+  }'
+
+# 7. Delete Product
+# POST /products/delete-product/{product_id}
+# Purpose: Remove product from system
+# Response: Success confirmation
+
+curl -X POST "http://localhost:8136/products/delete-product/1"
+
+# ==================================================
+# CART INVENTORY MANAGEMENT
+# ==================================================
+
+# 1. Update Cart Items (Replace Mode)
+# POST /cart_inventory/{cart_id}/items
+# Purpose: Replace entire cart contents with new items
+# Content-Type: application/json
+
+curl -X POST "http://localhost:8136/cart_inventory/1/items" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "replace",
+    "items": [
+      {"product_id": 1, "quantity": 2.5},
+      {"product_id": 2, "quantity": 1.0}
+    ]
+  }'
+
+# 2. Update Cart Items (Merge Mode)
+# POST /cart_inventory/{cart_id}/items
+# Purpose: Update specific items while keeping others unchanged
+# Content-Type: application/json
+
+curl -X POST "http://localhost:8136/cart_inventory/1/items" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "merge",
+    "items": [
+      {"product_id": 1, "quantity": 3.0}
+    ]
+  }'
+
+# 3. Update Cart Items (Delta Mode)
+# POST /cart_inventory/{cart_id}/items
+# Purpose: Apply incremental changes (add/subtract quantities)
+# Content-Type: application/json
+
+curl -X POST "http://localhost:8136/cart_inventory/1/items" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "delta",
+    "changes": [
+      {"product_id": 1, "delta": 1.0},
+      {"product_id": 2, "delta": -0.5}
+    ]
+  }'
+
+# 4. Get Cart Details
+# GET /cart_inventory/{cart_id}
+# Purpose: Retrieve cart contents with calculated totals
+# Response: Cart items with product details and total amount
+
+curl -X GET "http://localhost:8136/cart_inventory/1"
+
+# ==================================================
+# CART CONFIGURATION MANAGEMENT
+# ==================================================
+
+# 1. List All Carts
+# GET /cart_infor/list-all-cart
+# Purpose: Get configuration for all carts in system
+# Response: Array of cart configurations
+
+curl -X GET "http://localhost:8136/cart_infor/list-all-cart"
+
+# 2. Get Cart Configuration
+# GET /cart_infor/{cart_id}
+# Purpose: Get specific cart configuration details
+# Response: Cart configuration including MAC address, position, state, etc.
+
+curl -X GET "http://localhost:8136/cart_infor/1"
+
+# 3. Update Cart Configuration
+# POST /cart_infor/{cart_id}
+# Purpose: Update cart configuration settings
+# Content-Type: application/json
+
+curl -X POST "http://localhost:8136/cart_infor/1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cart_mac_address": "AA:BB:CC:DD:EE:FF",
+    "cart_position": "entrance",
+    "cart_state": "active",
+    "cam_stream_url": "http://192.168.1.100:8080/stream"
+  }'
+
+# 4. Delete Cart
+# POST /cart_infor/delete-cart/{cart_id}
+# Purpose: Remove cart configuration from system
+# Response: Success confirmation
+
+curl -X POST "http://localhost:8136/cart_infor/delete-cart/1"
+
+# ==================================================
+# MAP BEACON MANAGEMENT
+# ==================================================
+
+# 1. Get Map Beacons
+# GET /map_beacon/{map_id}
+# Purpose: Get all beacons configured for a specific map
+# Response: List of beacons with positioning data
+
+curl -X GET "http://localhost:8136/map_beacon/1"
+
+# 2. Get Beacon Configuration
+# GET /map_beacon/{map_id}/{beacon_id}
+# Purpose: Get specific beacon configuration details
+# Response: Beacon configuration with coordinates and parameters
+
+curl -X GET "http://localhost:8136/map_beacon/1/beacon001"
+
+# 3. Update Beacon Configuration
+# POST /map_beacon/{map_id}/{beacon_id}
+# Purpose: Update beacon positioning and parameters
+# Content-Type: application/json
+
+curl -X POST "http://localhost:8136/map_beacon/1/beacon001" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "beacon_mac_address": "11:22:33:44:55:66",
+    "beacon_x_coordinate": 10.5,
+    "beacon_y_coordinate": 20.3,
+    "beacon_D0": -59.0,
+    "beacon_n": 2.0
+  }'
+
+# 4. Delete Beacon
+# POST /map_beacon/delete-beacon/{map_id}/{beacon_id}
+# Purpose: Remove beacon from map configuration
+# Response: Success confirmation
+
+curl -X POST "http://localhost:8136/map_beacon/delete-beacon/1/beacon001"
+
+# 5. Delete All Map Beacons
+# POST /map_beacon/delete-map/{map_id}
+# Purpose: Remove all beacons for a specific map
+# Response: Success confirmation
+
+curl -X POST "http://localhost:8136/map_beacon/delete-map/1"
+
+# ==================================================
+# MAP MANAGEMENT
+# ==================================================
+
+# 1. Get Map Layout
+# GET /map/{map_id}
+# Purpose: Get all cells and layout for a specific map
+# Response: Complete map structure with cell assignments
+
+curl -X GET "http://localhost:8136/map/1"
+
+# 2. Get Map Cell
+# GET /map/{map_id}/{x_coor}/{y_coor}
+# Purpose: Get specific map cell information
+# Response: Cell details including area assignment
+
+curl -X GET "http://localhost:8136/map/1/5/10"
+
+# 3. Update Map Cell
+# POST /map/{map_id}/{x_coor}/{y_coor}
+# Purpose: Update area assignment for specific map cell
+# Content-Type: application/json
+
+curl -X POST "http://localhost:8136/map/1/5/10" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "area": "electronics"
+  }'
+
+# 4. Bulk Update Map
+# POST /map/map-upload/{map_id}
+# Purpose: Update multiple map cells in single operation
+# Content-Type: application/json
+
+curl -X POST "http://localhost:8136/map/map-upload/1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cells": [
+      {"x_coor": 1, "y_coor": 1, "area": "entrance"},
+      {"x_coor": 2, "y_coor": 1, "area": "dairy"},
+      {"x_coor": 3, "y_coor": 1, "area": "produce"}
+    ]
+  }'
+
+# 5. Delete Map
+# POST /map/delete-map/{map_id}
+# Purpose: Remove entire map configuration
+# Response: Success confirmation
+
+curl -X POST "http://localhost:8136/map/delete-map/1"
+
+# ==================================================
+# REAL-TIME STREAMING ENDPOINTS
+# ==================================================
+
+# 1. WebSocket Cart Inventory Stream
+# WebSocket: /ws/cart_inventory/{cart_id}
+# Purpose: Real-time cart inventory updates
+# Protocol: WebSocket with JSON messages
+# Usage: Connect to receive live cart changes
+
+# JavaScript WebSocket example:
+# const ws = new WebSocket('ws://localhost:8136/ws/cart_inventory/1');
+# ws.onmessage = (event) => console.log(JSON.parse(event.data));
+
+# 2. WebSocket Product Detection Stream
+# WebSocket: /ws/product-detect/{cart_id}
+# Purpose: Real-time product detection from cart camera
+# Protocol: WebSocket with JSON detection results
+# Usage: Connect to receive live detection events
+
+# JavaScript WebSocket example:
+# const ws = new WebSocket('ws://localhost:8136/ws/product-detect/1');
+# ws.onmessage = (event) => console.log('Detection:', JSON.parse(event.data));
+
+# 3. HTTP Video Stream
+# GET /stream?cart_id={cart_id}
+# Purpose: MJPEG video stream from cart camera
+# Content-Type: multipart/x-mixed-replace
+# Usage: Direct browser access or video player integration
+
+curl -X GET "http://localhost:8136/stream?cart_id=1"
+
+# ==================================================
+# RESPONSE FORMATS
+# ==================================================
+
+# Typical Success Response:
+# {
+#   "success": true,
+#   "data": {...},
+#   "timestamp": "2025-09-13T10:00:00Z"
+# }
+
+# Cart Response Example:
+# {
+#   "cart_id": 1,
+#   "items": [
+#     {
+#       "product_id": 1,
+#       "name": "Milk 1L",
+#       "quantity": 2.0,
+#       "price": 3.99,
+#       "weight_kg": 1.0,
+#       "subtotal": 7.98
+#     }
+#   ],
+#   "total": 7.98
+# }
+
+# Product Detail Response Example:
+# {
+#   "product_id": 1,
+#   "name": "Organic Milk 1L",
+#   "price": 3.99,
+#   "quantity": 50.0,
+#   "weight_kg": 1.0,
+#   "type": "dairy",
+#   "area": "refrigerated",
+#   "manufacturer": "Local Farm Co.",
+#   "expiry_or_mfg_date": "2025-12-31",
+#   "origin": "Local",
+#   "info1": "Organic certified",
+#   "info2": "Rich in calcium"
+# }
+
+# Error Response Example:
+# {
+#   "detail": "Product not found",
+#   "error_code": "PRODUCT_NOT_FOUND",
+#   "timestamp": "2025-09-13T10:00:00Z"
+# }
+
+# ==================================================
+# USAGE NOTES
+# ==================================================
+# - API service runs on port 8136 by default
+# - All endpoints support JSON request/response format
+# - WebSocket connections auto-reconnect on failure
+# - Cart inventory supports decimal quantities for weight-based products
+# - Map coordinates use integer grid system
+# - Beacon coordinates use decimal precision for accurate positioning
+# - Real-time streams optimized for minimal bandwidth usage
+# - CORS enabled for cross-origin browser requests
+# - Health check endpoint useful for monitoring and load balancers

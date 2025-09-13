@@ -1,0 +1,52 @@
+views:
+  - title: General
+    type: panel
+    icon: mdi:shopping-search
+    cards:
+      - type: custom:layout-card
+        layout_type: grid
+        layout:
+          grid-template-columns: minmax(700px, 1fr) minmax(400px, 0.8fr)
+          grid-gap: 15px
+          grid-template-areas: |
+            "map search"
+        cards:
+          - type: custom:general-map-card
+            cart_id: 142
+            view_layout:
+              grid-area: map
+          - type: custom:general-search-card
+            view_layout:
+              grid-area: search
+    path: general-142
+  - type: custom:grid-layout
+    path: shopping-list
+    title: Shopping List
+    cards:
+      - type: custom:layout-card
+        layout_type: grid
+        layout:
+          grid-template-columns: minmax(320px, 1fr) minmax(250px, 0.72fr)
+          grid-template-rows: 0.85fr 1fr
+          grid-template-areas: |
+            "cart product"
+            "cart video"
+          grid-gap: 15px
+        cards:
+          - type: custom:shopping-cart-card
+            cart_id: 142
+            view_layout:
+              grid-area: cart
+          - type: custom:product-info-card
+            title: Product Info
+            cart_id: 142
+            collapsed: false
+            aspect_ratio: 65%
+            view_layout:
+              grid-area: product
+          - type: custom:video-stream-card
+            title: Cart 142 Camera
+            cart_id: 142
+            view_layout:
+              grid-area: video
+    icon: mdi:cart-variant

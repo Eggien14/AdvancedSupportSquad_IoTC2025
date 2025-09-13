@@ -10,12 +10,12 @@ _DEFAULT_MODEL = _BASE_DIR / "models" / "my_model.pt"
 MODEL_PATH = os.getenv("MODEL_PATH", str(_DEFAULT_MODEL))
 
 IMG_SIZE = (480, 480)                 # (W, H)
-MIN_CONF_THRESHOLD = 0.6
+MIN_CONF_THRESHOLD = 0.7
 DETECT_INTERVAL = 7                   # detect mỗi 7 khung
 
 # Danh sách carts 
 CARTS = [
-    {"cart_id": 142, "source": "http://192.168.95.242:81/stream"},
+    {"cart_id": 142, "source": "http://192.168.0.102:81/stream"},
 ]
 
 # MÀU bbox 
@@ -26,10 +26,19 @@ BBOX_COLORS = [
 
 # Mapping nhãn YOLO -> product_id 
 LABEL_TO_ID = {
-    'Calculator': 1,
-    'Correction pen': 2,
-    'Highlight pen': 3,
-    'Note': 4,
-    'Staple remover': 5,
-    'Stapler': 6
+    'ballpoints_pen': 11,
+    'c2_lemon_tea': 7,
+    'cal_cheese': 2,
+    'candle': 15,
+    'candy': 5,
+    'choco_latte': 8,
+    'colgate': 12,
+    'hao_hao_noodle': 4,
+    'hongha_note': 10,
+    'lifeboys': 13,
+    'millo_milk': 6,
+    'snack_lays': 3,
+    'staff_bread': 1,
+    'staples': 9,
+    'toothbrush': 14,
 }

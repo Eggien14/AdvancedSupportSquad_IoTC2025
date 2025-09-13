@@ -12,17 +12,19 @@ class CartConfigResponse(BaseModel):
     model_config = {"from_attributes": True}
     
     cart_id: int
+    cart_mac_address: Optional[str] = None
     cart_position: Optional[str] = None
     cart_state: Optional[str] = None  
     cart_voice_cmd: Optional[str] = None
-    cart_ota: Optional[str] = None
+    cart_firmware_update: Optional[str] = None
     cam_stream_url: Optional[str] = None
 
 
 class CartConfigRequest(BaseModel):
     """Request schema cho cập nhật cart configuration"""
+    cart_mac_address: Optional[str] = None
     cart_position: Optional[str] = None
     cart_state: Optional[str] = None
     cart_voice_cmd: Optional[str] = None 
-    cart_ota: Optional[str] = None
+    cart_firmware_update: Optional[str] = None
     cam_stream_url: Optional[str] = None

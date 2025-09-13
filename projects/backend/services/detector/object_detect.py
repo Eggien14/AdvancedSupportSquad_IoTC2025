@@ -33,7 +33,7 @@ class ObjectDetector:
         model_path: str,
         image_size: Tuple[int, int] = (480, 480),
         detect_interval: int = 7,
-        min_conf_threshold: float = 0.6,
+        min_conf_threshold: float = 0.7,
         bbox_colors: List[Tuple[int,int,int]] = None,
         label_to_id: Dict[str,int] = None,
     ):
@@ -147,10 +147,13 @@ class ObjectDetector:
             cv2.putText(frame_drawn, f'FPS: {fps:0.2f}', (10, 20),
                         cv2.FONT_HERSHEY_SIMPLEX, .7, (0, 255, 255), 2)
             
-            # KHÔNG GHI FILE: encode JPG và lưu RAM
-            ok_jpg, jpg = cv2.imencode(".jpg", frame_drawn, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
-            if ok_jpg:
-                state.set_latest_jpeg(self.cart_id, jpg.tobytes())
+            # ENCODE JPG mỗi 3 frames để giảm lag (thay vì mỗi frame)
+            if self.frame_count % 1 == 0:
+                # Resize nhỏ hơn cho stream để giảm encoding time
+                stream_frame = cv2.resize(frame_drawn, (320, 240))
+                ok_jpg, jpg = cv2.imencode(".jpg", stream_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+                if ok_jpg:
+                    state.set_latest_jpeg(self.cart_id, jpg.tobytes())
 
             # nhẹ nhàng
             time.sleep(0.02)

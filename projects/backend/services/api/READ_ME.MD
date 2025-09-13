@@ -1,342 +1,297 @@
-﻿# services/api - FastAPI REST API Service
+# API Service - Smart Shopping Cart System
 
-##  MỤC ĐÍCH & CHỨC NĂNG
+## Overview
 
-Service API này cung cấp REST endpoints cho:
-- **Cart Management**: Quản lý giỏ hàng với 3 modes (replace/merge/delta) + auto inventory sync
-- **Product Management**: CRUD operations cho sản phẩm với inventory tracking  
-- **IoT Configuration**: Cấu hình BLE UUIDs cho cart IoT gateway
-- **Beacon Positioning**: Quản lý beacon map cho indoor navigation system
+The API Service is the central REST API gateway for the Smart Shopping Cart System, designed for IoT Challenge 2025 "Edge AI for smart retail". This service provides comprehensive endpoints for product management, cart operations, spatial mapping, and real-time data streaming.
 
-##  CẤU TRÚC THƯ MỤC
+**Team**: Advanced Support Squad  
+**Organized by**: FPT Software & Silicon Labs  
+**Technology Stack**: FastAPI, MySQL, WebSocket, Docker
 
+## Architecture
+
+### Service Architecture
 ```
-services/api/
- server.py              #  FastAPI app khởi tạo + endpoint definitions
- schemas/               #  Pydantic schemas cho request/response
-    __init__.py
-    cart.py           # Cart-related schemas (CartResponse, CartItem, etc.)
-    cart_inventory.py #  Inventory schemas (ReplaceUpsert, MergeUpsert, DeltaUpsert)
-    product.py        # Product schemas (Product, ProductDetail, ProductType)
-    cart_config.py    #  IoT cart configuration schemas
-    map_beacon.py     #  Beacon positioning schemas
- Dockerfile            #  Container image definition
- requirements.txt      #  Python dependencies
- api_endpoint.txt      #  Chi tiết API documentation 
- READ_ME.MD           #  File này - API service documentation
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Client Apps   │────│   API Service    │────│  Shared Layer   │
+│                 │    │   (FastAPI)      │    │   (Database)    │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                              │
+                       ┌──────────────────┐
+                       │  Detector Service│
+                       │    (YOLOv8)      │
+                       └──────────────────┘
 ```
 
-##  CORE COMPONENTS
+### Layer Structure
+- **API Layer**: FastAPI endpoints with Pydantic schemas
+- **Service Layer**: Business logic implementation  
+- **Repository Layer**: Database access patterns
+- **Shared Layer**: Common utilities and database connection
 
-### **server.py** - FastAPI Application
-```python
-# Main FastAPI app với:
-- CORS middleware (development)
-- Exception handlers
-- Health check endpoint
-- All business endpoints
-- Auto-generated OpenAPI docs (/docs)
-```
+## Configuration
 
-### **schemas/** - Data Validation Layer
-```python
-# Pydantic V2 schemas với:
-- Type safety và validation
-- Discriminated unions cho cart operations
-- Request/response models
-- Auto JSON schema generation
-```
-
-### **Dependencies**
-```python
-# Service phụ thuộc vào:
-services/shared/
- db.py          # Database connection (MySQL)
- repos.py       # Repository layer (data access)
- services.py    # Business logic layer
-```
-
-##  API ENDPOINTS SUMMARY
-
-### **Health & Documentation**
-```
-GET  /healthz          # Service health check
-GET  /docs             # Swagger UI documentation  
-GET  /openapi.json     # OpenAPI specification
-```
-
-### **Cart Inventory Management** 
-```
-POST /cart_inventory/{cart_id}/items    # Universal cart update với inventory sync
-GET  /cart_inventory/{cart_id}          # Get cart với product details + totals
-```
-
-### **Product & Warehouse**
-```
-GET  /products/{product_id}             # Product detail + inventory quantity
-GET  /products?name={text}&limit={num}  # Search products by name
-GET  /products/by-area/{area}?limit={}  # List products by warehouse area
-GET  /products/by-type/{type}?limit={}  # List products by type
-```
-
-### **IoT Cart Configuration**   
-```
-GET  /cart_infor/{cart_id}              # Get BLE UUIDs + camera config
-POST /cart_infor/{cart_id}              # Update cart IoT configuration
-```
-
-### **Beacon Positioning System** 
-```
-GET  /map_beacon/{map_id}               # Get all beacons in map
-GET  /map_beacon/{map_id}/{beacon_id}   # Get specific beacon config
-POST /map_beacon/{map_id}/{beacon_id}   # Update beacon (UPSERT)
-```
-
-
-##  PYDANTIC SCHEMAS
-
-### **Cart Inventory Schemas** (cart_inventory.py)
-```python
-# Discriminated Union pattern cho type safety
-class ReplaceUpsert(BaseModel):
-    mode: Literal["replace"] = "replace"
-    items: List[CartItem]
-
-class MergeUpsert(BaseModel):  
-    mode: Literal["merge"] = "merge"
-    items: List[CartItem]
-
-class DeltaUpsert(BaseModel):
-    mode: Literal["delta"] = "delta" 
-    changes: List[CartDelta]
-
-# Union type với discriminator
-CartInventoryRequest = Annotated[
-    Union[ReplaceUpsert, MergeUpsert, DeltaUpsert],
-    Field(discriminator='mode')
-]
-```
-
-### **Product Schemas** (product.py)
-```python
-class Product(BaseModel):           # Basic product info
-    product_id: int
-    name: str
-    price: Decimal
-    quantity: int                   #  Inventory quantity
-
-class ProductDetail(Product):       # Full product details
-    type: str
-    area: Optional[str]
-    weight_kg: Optional[Decimal]
-    manufacturer: Optional[str]
-    # ... other fields
-
-class ProductSimple(BaseModel):     # Simple list for dropdowns
-    product_id: int                 
-    name: str                       # Chỉ ID và name cho gọn
-
-class ProductUpdate(BaseModel):     # Create/Update operations
-    product_name: str               # Required field
-    product_type: str               # Required field  
-    price: Decimal                  # Required field >= 0
-    quantity: int                   # Required field >= 0
-    area: Optional[str]             # Optional fields
-    weight_kg: Optional[Decimal]    # Can be null or empty string
-    manufacturer: Optional[str]     # Empty strings → null
-    # ... other optional fields
-```
-
-### **IoT Configuration** (cart_config.py)
-```python
-class CartConfig(BaseModel):
-    cart_id: int
-    cart_position: Optional[str]    # BLE UUID
-    cart_state: Optional[str]       # BLE UUID  
-    cart_voice_cmd: Optional[str]   # BLE UUID
-    cart_ota: Optional[str]         # BLE UUID
-    cam_stream_url: Optional[str]   # RTSP/HTTP URL
-```
-
-### **Beacon Positioning** (map_beacon.py)
-```python
-class MapBeacon(BaseModel):
-    beacon_id: str
-    beacon_blea_uuid: str
-    beacon_x_coordinate: Decimal
-    beacon_y_coordinate: Decimal  
-    beacon_D0: Decimal             # RSSI at 1m
-    beacon_n: Decimal              # Path loss exponent
-```
-
-
-##  BUSINESS LOGIC
-
-### **Cart Inventory Management**
-API tự động đồng bộ inventory khi thao tác cart:
-
-**Replace Mode:**
-1. Lấy cart hiện tại  tính delta với items mới
-2. Trả inventory: `old_qty - new_qty` (nếu > 0)
-3. Lấy inventory: `new_qty - old_qty` (nếu > 0)  
-4. Thay thế toàn bộ cart
-
-**Merge Mode:**
-1. Cập nhật từng item riêng lẻ
-2. Tính delta cho từng product: `old_cart_qty - new_cart_qty`
-3. Cập nhật inventory tương ứng
-
-**Delta Mode:**
-1. `delta > 0`: Thêm vào cart, lấy từ kho
-2. `delta < 0`: Bỏ khỏi cart, trả về kho (chỉ trả đúng số có)
-3. Smart handling: Cart có 3, delta -5  trả về 3, cart = 0
-
-**Auto Cleanup:** Xóa cart_items có quantity = 0
-
-### **New Product Management APIs** (v2.1)
-
-**GET /products/list-all-product:**
-- Trả về tất cả sản phẩm với chỉ ID + name
-- Không có pagination, tối ưu cho dropdown lists
-- Response schema: `List[ProductSimple]`
-
-**POST /products/update-product/{product_id}:**
-- **UPSERT operation**: Tạo mới nếu ID chưa tồn tại, update nếu đã có
-- **Smart validation**: Required fields (name, type, price, quantity)
-- **Empty string handling**: Chuỗi rỗng `""` → `null` cho optional fields  
-- **Response**: Full ProductDetail sau khi create/update
-
-**POST /products/delete-product/{product_id}:**
-- Xóa vĩnh viễn sản phẩm theo ID
-- **Safety checks**: Kiểm tra tồn tại trước khi xóa
-- **Confirmation response**: Trả về thông tin sản phẩm đã xóa
-
-### **IoT Integration Features**
-- BLE UUID configuration cho cart positioning
-- Camera stream URL management  
-- UPSERT operations (ON DUPLICATE KEY UPDATE)
-
-### **Beacon Positioning System**
-- Map-based beacon management
-- RSSI calibration parameters (D0, n)
-- Coordinate system support cho indoor navigation
-
-##  DEPENDENCIES & INTEGRATION
-
-### **External Dependencies** (requirements.txt)
-```
-fastapi>=0.110.0           # Web framework
-uvicorn[standard]>=0.30.0  # ASGI server
-pydantic>=2.8.0            # Data validation
-PyMySQL>=1.1.0             # MySQL connector
-python-multipart           # Form data support
-```
-
-### **Internal Dependencies**
-```python
-# Import từ shared modules:
-from services.shared.db import get_connection
-from services.shared.repos import (
-    ProductRepo, CartRepo, 
-    CartConfigRepo, MapBeaconRepo  # 
-)
-from services.shared.services import (
-    ProductService, CartService,
-    CartConfigService, MapBeaconService  #   
-)
-```
-
-### **Database Integration**
-- MySQL 8.0 với connection pooling
-- Repository pattern cho data access
-- Foreign key constraints cho data integrity
-- Transaction support cho complex operations
-
-
-##  DEVELOPMENT & DEPLOYMENT
-
-### **Environment Variables**
+### Environment Variables
 ```bash
-# Required for database connection
-MYSQL_HOST=mysql           # Container name hoặc IP
-MYSQL_PORT=3306
-MYSQL_USER=root
-MYSQL_PASSWORD=root123
-MYSQL_DATABASE=ass_main
-
-# Optional API configuration  
-API_HOST=0.0.0.0
-API_PORT=8136
-CORS_ORIGINS=*             # Development only
-LOG_LEVEL=INFO
+DB_HOST=db                                    # Database host
+DB_PORT=3306                                  # Database port  
+DB_USER=eggien                               # Database user
+DB_PASSWORD=0363802865                       # Database password
+DB_NAME=iotc25_advanced_support_squad        # Database name
+API_PORT=8136                                # API service port
+CACHE_ENABLED=true                           # Enable caching
+UVICORN_WORKERS=2                            # Uvicorn worker count
 ```
 
-### **Docker Configuration**
-```dockerfile
-# Dockerfile highlights:
-FROM python:3.11-slim
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY services/api services/api
-COPY services/shared services/shared
-EXPOSE 8136
-CMD ["uvicorn", "services.api.server:app", "--host", "0.0.0.0", "--port", "8136"]
+### Docker Configuration
+- **Port**: 8136 (HTTP API)
+- **Base Image**: python:3.11-slim
+- **Deployment**: Docker Compose with nginx proxy (production) or direct access (simple)
+
+## API Endpoints
+
+### Health Check
+- `GET /healthz` - Service health status
+
+### Product Management
+- `GET /products/list-all-product` - List all products (ID + name only)
+- `GET /products` - Search products with filters
+- `GET /products/{product_id}` - Get detailed product information
+- `GET /products/by-area/{area}` - Get products by area
+- `GET /products/by-type/{product_type}` - Get products by type
+- `POST /products/update-product/{product_id}` - Update product details
+- `POST /products/delete-product/{product_id}` - Delete product
+
+### Cart Inventory Management
+- `POST /cart_inventory/{cart_id}/items` - Update cart items (replace/merge/delta modes)
+- `GET /cart_inventory/{cart_id}` - Get cart details with total calculation
+
+### Cart Configuration
+- `GET /cart_infor/list-all-cart` - List all cart configurations
+- `GET /cart_infor/{cart_id}` - Get specific cart configuration
+- `POST /cart_infor/{cart_id}` - Update cart configuration
+- `POST /cart_infor/delete-cart/{cart_id}` - Delete cart configuration
+
+### Map Beacon Management
+- `GET /map_beacon/{map_id}` - Get all beacons for a map
+- `GET /map_beacon/{map_id}/{beacon_id}` - Get specific beacon configuration
+- `POST /map_beacon/{map_id}/{beacon_id}` - Update beacon configuration
+- `POST /map_beacon/delete-beacon/{map_id}/{beacon_id}` - Delete beacon
+- `POST /map_beacon/delete-map/{map_id}` - Delete all beacons for map
+
+### Map Management
+- `GET /map/{map_id}` - Get all cells for a map
+- `GET /map/{map_id}/{x_coor}/{y_coor}` - Get specific map cell
+- `POST /map/{map_id}/{x_coor}/{y_coor}` - Update map cell
+- `POST /map/delete-map/{map_id}` - Delete entire map
+- `POST /map/map-upload/{map_id}` - Bulk update map cells
+
+### Real-time Streaming
+- `WebSocket /ws/cart_inventory/{cart_id}` - Real-time cart inventory updates
+- `WebSocket /ws/product-detect/{cart_id}` - Real-time product detection stream
+- `GET /stream` - HTTP streaming endpoint
+
+## Data Models
+
+### Product Schemas
+- **Product**: Basic product information (ID, name, price, quantity, weight)
+- **ProductDetail**: Complete product details with metadata
+- **ProductListItem**: Product list view with area and type
+- **ProductSimple**: Minimal product info (ID + name)
+- **ProductUpdate**: Schema for product modifications
+
+### Cart Inventory Schemas
+- **CartUpsert**: Union type supporting three update modes:
+  - **Replace**: Complete cart replacement
+  - **Merge**: Partial cart update with absolute quantities
+  - **Delta**: Incremental changes (add/remove items)
+- **CartResponse**: Cart details with calculated totals
+- **CartItem**: Individual cart item with product details
+
+### Configuration Schemas
+- **CartConfigRequest/Response**: Cart configuration management
+- **MapBeaconRequest/Response**: Beacon positioning data
+- **MapRequest/Response**: Map cell area assignments
+
+## Business Logic
+
+### Cart Update Modes
+
+1. **Replace Mode**
+   ```json
+   {
+     "mode": "replace",
+     "items": [
+       {"product_id": 1, "quantity": 2.5},
+       {"product_id": 2, "quantity": 1.0}
+     ]
+   }
+   ```
+
+2. **Merge Mode**
+   ```json
+   {
+     "mode": "merge", 
+     "items": [
+       {"product_id": 1, "quantity": 3.0}
+     ]
+   }
+   ```
+
+3. **Delta Mode**
+   ```json
+   {
+     "mode": "delta",
+     "changes": [
+       {"product_id": 1, "delta": 1.0},
+       {"product_id": 2, "delta": -0.5}
+     ]
+   }
+   ```
+
+### Product Search Features
+- **By Name**: Fuzzy text search with LIKE patterns
+- **By Area**: Filter products by store area/section
+- **By Type**: Filter products by category/type
+- **Pagination**: Configurable result limits
+
+### Map System
+- **Grid-based**: X/Y coordinate system for store layout
+- **Beacon Integration**: BLE beacon positioning for cart tracking
+- **Area Assignment**: Map cells assigned to store areas
+- **Bulk Operations**: Efficient mass updates for map configuration
+
+## Real-time Features
+
+### WebSocket Streams
+- **Cart Inventory Stream**: Live cart updates as items change
+- **Product Detection Stream**: Real-time object detection from cart cameras
+- **Change Detection**: Optimized streaming using signature-based change detection
+
+### HTTP Streaming
+- **MJPEG Stream**: Video stream from cart cameras
+- **Low Latency**: Optimized for real-time monitoring
+
+## Dependencies
+
+### Core Dependencies
+```
+fastapi==0.116.1          # Web framework
+uvicorn==0.35.0           # ASGI server
+pydantic==2.11.7          # Data validation
+pydantic-settings==2.6.1  # Settings management
+pymysql==1.1.1            # MySQL connector
+requests==2.31.0          # HTTP client
+websockets==12.0          # WebSocket support
 ```
 
-### **Running the API Service**
+### Shared Layer Dependencies
+- Database connection management
+- Service layer business logic
+- Repository pattern implementation
+- Settings and configuration management
 
-**Via Docker Compose (Recommended):**
+## Development
+
+### Local Development
 ```bash
-docker-compose up api -d --build
+# Install dependencies
+pip install -r requirements.txt
+
+# Run development server
+uvicorn services.api.server:app --reload --host 0.0.0.0 --port 8136
 ```
 
-**Local Development:**
+### Docker Development
 ```bash
-# Setup environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r services/api/requirements.txt
+# Simple development setup
+docker-compose -f docker-compose.simple.yaml up --build
 
-# Set environment variables
-export MYSQL_HOST=localhost  # PowerShell: $env:MYSQL_HOST="localhost"
-
-# Run with reload
-uvicorn services.api.server:app --reload --port 8136
+# Production setup with nginx
+docker-compose up --build
 ```
 
-**Testing the Service:**
+### Testing API
 ```bash
 # Health check
 curl http://localhost:8136/healthz
 
-# API documentation  
-open http://localhost:8136/docs
+# List products
+curl http://localhost:8136/products/list-all-product
 
-# Sample API call
-curl http://localhost:8136/products?name=vở&limit=3
+# Get cart details
+curl http://localhost:8136/cart_inventory/1
 ```
 
-### **Error Handling & Logging**
-- HTTP exception handlers cho clean error responses
-- Console logging cho development (có thể extend cho production)
-- Pydantic validation errors  422 responses
-- Database errors  500 responses với generic message
+## Integration
 
-### **Security Considerations**
-- **Development**: CORS enabled, no authentication
-- **Production**: Recommend JWT/API keys, HTTPS reverse proxy
-- **Input Validation**: Pydantic schemas prevent injection
-- **Database**: Parameterized queries via repository layer
+### With Detector Service
+- **Detection Results**: Receives object detection data from YOLOv8 service
+- **Real-time Updates**: WebSocket streams for live detection feeds
+- **Cart Synchronization**: Automatic inventory updates from camera detection
 
-##  API DOCUMENTATION
+### With Database
+- **Connection Pool**: Managed database connections via shared layer
+- **Transaction Support**: Atomic operations for cart updates
+- **Data Integrity**: Foreign key constraints and validation
 
-Để xem chi tiết API endpoints với examples:
- **Xem file: `api_endpoint.txt`** - Complete API reference với JSON examples
+### With Frontend
+- **CORS Enabled**: Cross-origin requests supported
+- **REST API**: Standard HTTP methods and status codes
+- **WebSocket Support**: Real-time data streaming to web clients
 
-Để test API interactively:  
- **Visit: `http://localhost:8136/docs`** - Swagger UI
+## Monitoring
+
+### Health Checks
+- **Endpoint**: `/healthz` returns service status
+- **Database**: Connection health validation
+- **Dependencies**: Shared service availability
+
+### Error Handling
+- **HTTP Status Codes**: Standard REST API error responses
+- **Validation Errors**: Detailed Pydantic validation messages
+- **Database Errors**: Graceful handling of connection issues
+
+## Security
+
+### Data Validation
+- **Pydantic Models**: Strict input validation and type checking
+- **SQL Injection Prevention**: Parameterized queries via PyMySQL
+- **Input Sanitization**: Automatic data cleaning and validation
+
+### CORS Configuration
+- **Origins**: Configurable allowed origins
+- **Methods**: All HTTP methods supported
+- **Headers**: Flexible header configuration for development
+
+## Performance
+
+### Optimization Features
+- **Connection Pooling**: Efficient database connection management
+- **Caching**: Optional caching layer for frequently accessed data
+- **Async Processing**: Non-blocking I/O operations
+- **Worker Scaling**: Multiple Uvicorn workers for concurrent requests
+
+### WebSocket Optimization
+- **Change Detection**: Signature-based change detection to minimize data transfer
+- **Efficient Serialization**: Optimized JSON serialization for real-time streams
+- **Connection Management**: Automatic reconnection and error handling
+
+## Deployment
+
+### Production Configuration
+- **Nginx Proxy**: SSL termination and load balancing
+- **Health Checks**: Docker health monitoring
+- **Auto-restart**: Service resilience with restart policies
+- **Logging**: Structured logging for monitoring and debugging
+
+### Scaling Considerations
+- **Horizontal Scaling**: Multiple API instances behind nginx
+- **Database Optimization**: Connection pooling and query optimization
+- **WebSocket Scaling**: Consider Redis for multi-instance WebSocket support
 
 ---
 
-**services/api - REST API Service for IoT Cart Management System**  
-*Part of Advanced Support Squad v2.1*
+**Documentation Version**: 1.0.0  
+**Last Updated**: September 13, 2025  
+**Maintained by**: Advanced Support Squad

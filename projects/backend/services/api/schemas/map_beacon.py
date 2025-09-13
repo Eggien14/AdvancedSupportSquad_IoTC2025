@@ -13,7 +13,7 @@ class MapBeaconResponse(BaseModel):
     
     map_id: int
     beacon_id: str
-    beacon_blea_uuid: Optional[str] = None
+    beacon_mac_address: Optional[str] = None
     beacon_x_coordinate: Optional[Decimal] = None
     beacon_y_coordinate: Optional[Decimal] = None
     beacon_D0: Optional[Decimal] = None
@@ -22,7 +22,7 @@ class MapBeaconResponse(BaseModel):
 
 class MapBeaconRequest(BaseModel):
     """Request schema cho cập nhật map beacon"""
-    beacon_blea_uuid: Optional[str] = None
+    beacon_mac_address: Optional[str] = None
     beacon_x_coordinate: Optional[Decimal] = None
     beacon_y_coordinate: Optional[Decimal] = None
     beacon_D0: Optional[Decimal] = None

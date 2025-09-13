@@ -24,70 +24,154 @@ logger:
     homeassistant.components.bluetooth: debug
 
 input_text:
-  api_base:
-    name: API Base URL
-    initial: "http://192.168.108.45:8136"
+  # API Configuration - User can edit these directly
+  api_base_http:
+    name: API Base HTTP URL
     max: 255
-    
+    mode: text
+  api_base_https:
+    name: API Base HTTPS URL
+    max: 255
+    mode: text
+
   # Admin Cart Management
   admin_cart_list:
     name: "Admin Cart List"
-    initial: "142,105"
     max: 255
+    mode: text
+  
+  # Admin Map Management
+  admin_map_list:
+    name: "Admin Map List"
+    max: 255
+    mode: text
     
-  # Cart Config Storage (JSON strings)
-  cart_new_config_142:
-    name: "Cart 142 New Config"
-    initial: "{}"
-    max: 1000
-  cart_old_config_142:
-    name: "Cart 142 Old Config"
-    initial: "{}"
-    max: 1000
-  cart_new_config_105:
-    name: "Cart 105 New Config"
-    initial: "{}"
-    max: 1000
-  cart_old_config_105:
-    name: "Cart 105 Old Config"
-    initial: "{}"
-    max: 1000
+  map_entity_colour:
+    name: "Map Entity Colour"
+    max: 255
+    mode: text
     
-  cart_142_search_name:
-    name: "142: Search by name"
-    initial: ""
-    max: 120
-  cart_142_search_area:
-    name: "142: Search by area"
-    initial: ""
-    max: 40
-  cart_142_search_type:
-    name: "142: Search by type"
-    initial: ""
-    max: 40
+  admin_cart_map_connect:
+    name: "Admin Cart Map Connect"
+    max: 255
+    mode: text
+    
+  # Cart New Config - Shared fields (comma-separated values in order of admin_cart_list)
+  cart_new_mac_address:
+    name: "Cart New MAC Address"
+    max: 255
+    mode: text
+  cart_new_position_uuid:
+    name: "Cart New Position UUID"
+    max: 255
+    mode: text
+  cart_new_state_uuid:
+    name: "Cart New State UUID"
+    max: 255
+    mode: text
+  cart_new_voice_uuid:
+    name: "Cart New Voice UUID"
+    max: 255
+    mode: text
+  cart_new_firmware_uuid:
+    name: "Cart New Firmware UUID"
+    max: 255
+    mode: text
+  cart_new_camera_url:
+    name: "Cart New Camera URL"
+    max: 255
+    mode: text
+    
+  # Cart Old Config - Shared fields (comma-separated values in order of admin_cart_list)
+  cart_old_mac_address:
+    name: "Cart Old MAC Address"
+    max: 255
+    mode: text
+  cart_old_position_uuid:
+    name: "Cart Old Position UUID"
+    max: 255
+    mode: text
+  cart_old_state_uuid:
+    name: "Cart Old State UUID"
+    max: 255
+    mode: text
+  cart_old_voice_uuid:
+    name: "Cart Old Voice UUID"
+    max: 255
+    mode: text
+  cart_old_firmware_uuid:
+    name: "Cart Old Firmware UUID"
+    max: 255
+    mode: text
+  cart_old_camera_url:
+    name: "Cart Old Camera URL"
+    max: 255
+    mode: text
 
-  cart_105_search_name:
-    name: "105: Search by name"
-    initial: ""
-    max: 120
-  cart_105_search_area:
-    name: "105: Search by area"
-    initial: ""
-    max: 40
-  cart_105_search_type:
-    name: "105: Search by type"
-    initial: ""
-    max: 40
+  # Map Beacon Config - Map 510 (comma-separated values in order of beacon_id list)
+  map_510_new_beacon_id:
+    name: "Map 510 New Beacon ID List"
+    max: 255
+    mode: text
+  map_510_new_beacon_mac_address:
+    name: "Map 510 New Beacon MAC Address"
+    max: 255
+    mode: text
+  map_510_new_beacon_x_coordinate:
+    name: "Map 510 New Beacon X Coordinate"
+    max: 255
+    mode: text
+  map_510_new_beacon_y_coordinate:
+    name: "Map 510 New Beacon Y Coordinate"
+    max: 255
+    mode: text
+  map_510_new_beacon_d0:
+    name: "Map 510 New Beacon D0 (Reference Distance)"
+    max: 255
+    mode: text
+  map_510_new_beacon_n:
+    name: "Map 510 New Beacon n (Path Loss Exponent)"
+    max: 255
+    mode: text
+    
+  # Map Beacon Old Config - Map 510 (comma-separated values in order of beacon_id list)
+  map_510_old_beacon_id:
+    name: "Map 510 Old Beacon ID List"
+    max: 255
+    mode: text
+  map_510_old_beacon_mac_address:
+    name: "Map 510 Old Beacon MAC Address"
+    max: 255
+    mode: text
+  map_510_old_beacon_x_coordinate:
+    name: "Map 510 Old Beacon X Coordinate"
+    max: 255
+    mode: text
+  map_510_old_beacon_y_coordinate:
+    name: "Map 510 Old Beacon Y Coordinate"
+    max: 255
+    mode: text
+  map_510_old_beacon_d0:
+    name: "Map 510 Old Beacon D0 (Reference Distance)"
+    max: 255
+    mode: text
+  map_510_old_beacon_n:
+    name: "Map 510 Old Beacon n (Path Loss Exponent)"
+    max: 255
+    mode: text
+
 
 #######################################################
-# CART 142 — cart_inventory & cart_config & cart_search
+# CART INVENTORY SENSORS (REST - Auto-refresh)
 #######################################################
 sensor:
-  # --- INVENTORY SENSORS — CART 142 ---
+  #######################################################
+  # CART 142 — cart_inventory & BLE
+  #######################################################
   - platform: rest
     name: "Cart 142 Inventory"
     unique_id: cart_142_inventory
-    resource_template: "{{ states('input_text.api_base') ~ '/cart_inventory/142' }}"
+    resource_template: "{{ states('input_text.api_base_http') }}/cart_inventory/142"
     method: GET
     scan_interval: 3600
     timeout: 5
@@ -98,73 +182,17 @@ sensor:
     headers:
       Accept: "application/json"
 
-  # --- CONFIG SENSORS — CART 142 ---
-  - platform: rest
-    name: "Cart 142 Config"
-    unique_id: cart_142_config
-    resource_template: "{{ states('input_text.api_base') ~ '/cart_infor/142' }}"
-    method: GET
-    scan_interval: 3600
-    timeout: 5
-    value_template: "{{ value_json.cart_id }}"
-    json_attributes:
-      - cart_id
-      - cam_stream_url
-      - beacon_uuid_1
-      - beacon_uuid_2
-      - beacon_uuid_3
-      - beacon_uuid_4
-      - map_id
-    headers:
-      Accept: "application/json"
-  # --- SEARCH SENSORS — CART 142 ---
-  - platform: rest
-    name: cart_142_search_by_name
-    unique_id: cart_142_search_by_name
-    resource_template: >
-      {{ states('input_text.api_base')
-         ~ '/products?name=' ~ (states('input_text.cart_142_search_name') | urlencode)
-         ~ '&limit=50' }}
-    method: GET
-    scan_interval: 3600
-    timeout: 5
-    value_template: "{{ value_json | default([], true) | length }}"
-    headers: { Accept: "application/json" }
-
-  - platform: rest
-    name: cart_142_search_by_area
-    unique_id: cart_142_search_by_area
-    resource_template: >
-      {{ states('input_text.api_base')
-         ~ '/products/by-area/' ~ (states('input_text.cart_142_search_area') | urlencode)
-         ~ '?limit=50' }}
-    method: GET
-    scan_interval: 3600
-    timeout: 5
-    value_template: "{{ value_json | default([], true) | length }}"
-    headers: { Accept: "application/json" }
-
-  - platform: rest
-    name: cart_142_search_by_type
-    unique_id: cart_142_search_by_type
-    resource_template: >
-      {{ states('input_text.api_base')
-         ~ '/products/by-type/' ~ (states('input_text.cart_142_search_type') | urlencode)
-         ~ '?limit=50' }}
-    method: GET
-    scan_interval: 3600
-    timeout: 5
-    value_template: "{{ value_json | default([], true) | length }}"
-    headers: { Accept: "application/json" }
+  - platform: cart_ble
+    address: "C0:2C:ED:90:AD:C3"
+    cart: 142
 
   #######################################################
-  # CART 105 — cart_inventory & cart_config & cart_search
+  # CART 105 — cart_inventory & BLE
   #######################################################
-  # --- INVENTORY SENSORS — CART 105 ---
   - platform: rest
     name: "Cart 105 Inventory"
     unique_id: cart_105_inventory
-    resource_template: "{{ states('input_text.api_base') ~ '/cart_inventory/105' }}"
+    resource_template: "{{ states('input_text.api_base_http') }}/cart_inventory/105"
     method: GET
     scan_interval: 3600
     timeout: 5
@@ -174,61 +202,7 @@ sensor:
       - items
     headers:
       Accept: "application/json"
-  # --- CONFIG SENSORS — CART 105 ---
-  - platform: rest
-    name: "Cart 105 Config"
-    unique_id: cart_105_config
-    resource_template: "{{ states('input_text.api_base') ~ '/cart_infor/105' }}"
-    method: GET
-    scan_interval: 3600
-    timeout: 5
-    value_template: "{{ value_json.cart_id }}"
-    json_attributes:
-      - cart_id
-      - cam_stream_url
-      - beacon_uuid_1
-      - beacon_uuid_2
-      - beacon_uuid_3
-      - beacon_uuid_4
-      - map_id
-    headers:
-      Accept: "application/json"
-  # --- SEARCH SENSORS — CART 105 ---
-  - platform: rest
-    name: cart_105_search_by_name
-    unique_id: cart_105_search_by_name
-    resource_template: >
-      {{ states('input_text.api_base')
-         ~ '/products?name=' ~ (states('input_text.cart_105_search_name') | urlencode)
-         ~ '&limit=50' }}
-    method: GET
-    scan_interval: 3600
-    timeout: 5
-    value_template: "{{ value_json | default([], true) | length }}"
-    headers: { Accept: "application/json" }
 
-  - platform: rest
-    name: cart_105_search_by_area
-    unique_id: cart_105_search_by_area
-    resource_template: >
-      {{ states('input_text.api_base')
-         ~ '/products/by-area/' ~ (states('input_text.cart_105_search_area') | urlencode)
-         ~ '?limit=50' }}
-    method: GET
-    scan_interval: 3600
-    timeout: 5
-    value_template: "{{ value_json | default([], true) | length }}"
-    headers: { Accept: "application/json" }
-
-  - platform: rest
-    name: cart_105_search_by_type
-    unique_id: cart_105_search_by_type
-    resource_template: >
-      {{ states('input_text.api_base')
-         ~ '/products/by-type/' ~ (states('input_text.cart_105_search_type') | urlencode)
-         ~ '?limit=50' }}
-    method: GET
-    scan_interval: 3600
-    timeout: 5
-    value_template: "{{ value_json | default([], true) | length }}"
-    headers: { Accept: "application/json" }
+  # - platform: cart_ble
+  #   address: "C0:2C:ED:90:AD:C3"
+  #   cart: 105
