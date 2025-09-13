@@ -1,135 +1,717 @@
-# =========================================
-# how_to_run.txt - UPDATED FOR MULTIPLE COMPOSE FILES
-# Hướng dẫn chạy dự án theo nhiều chế độ (Windows/WSL/macOS/Linux)
-# =========================================
+# Smart Shopping Cart System - Complete Deployment Guide
+# =====================================================
+# IoT Challenge 2025 "Edge AI for smart retail"
+# Team: Advanced Support Squad
+# Organized by: FPT Software & Silicon Labs
 
-# 📁 CÁC FILE DOCKER COMPOSE TRONG DỰ ÁN:
-# - docker-compose.yaml        → CÓ CACHE (cổng 8136, 8100, 3308)
-# - docker-compose.simple.yaml → KHÔNG CACHE (cổng 8137, 8101, 3309)
+## 📋 Overview
 
-# 🎯 KHUYẾN NGHỊ: Dùng docker-compose.simple.yaml cho test đơn giản
+This guide covers ALL methods to run the Smart Shopping Cart System server:
+1. Virtual Environment (my_env) - Local development
+2. Docker Command Line - Manual container management
+3. Docker Desktop - GUI-based management
+4. VS Code Docker Extension - IDE-integrated development
+5. PowerShell Script (docker.ps1) - Automated management
+6. Production Deployment - Full-scale production setup
 
-# 0) TIỀN ĐỀ & CỔNG
-# - Yêu cầu: Docker Desktop (Compose v2), Python 3.11, Git.
-# - Chỉ khác nhau về CACHE và CỔNG - chức năng giống nhau.
-# - Thư mục gốc: docker-compose.*.yaml, db/, services/.
+## 🏗️ System Architecture Quick Reference
 
-# 1) CHẠY CHẾ ĐỘ ĐƠN GIẢN (KHUYẾN NGHỊ CHO NGƯỜI MỚI) ⭐
-# --------------------------------------------------
-# 1.1) Build & up (Simple Mode):
-#   docker compose -f docker-compose.simple.yaml up -d --build
-#   # Đặc điểm: LOG_LEVEL=INFO, DEBUG=false, CACHE=false
-#
-# 1.2) Kiểm tra:
-#   curl http://localhost:8136/healthz
-#   curl http://localhost:8136/products/1
-#   curl http://localhost:8100/healthz
-#   # Swagger: http://localhost:8136/docs
-#
-# 1.3) Database (MySQL Workbench):
-#   Host: 127.0.0.1  Port: 3308  
-#   User: eggien  Pass: 0363802865  
-#   DB: iotc25_advanced_support_squad
-#
-# 1.4) Logs đơn giản:
-#   docker compose -f docker-compose.simple.yaml logs -f api
-#
-# 1.5) Down:
-#   docker compose -f docker-compose.simple.yaml down
+```
+┌─────────────────┐    ┌──────────────────┐   ┌─────────────────┐
+│   Nginx Proxy   │    │   API Service    │   │ Detector Service│
+│  HTTP: 8136     │────│   Port: 8136     │───│   Port: 8100    │
+│  HTTPS: 8118    │    │   (FastAPI)      │   │   (YOLOv8)      │
+└─────────────────┘    └─────────┬────────┘   └─────────┬───────┘
+                                 │                      │
+                                 └──────┬───────────────┘
+                                        │
+                                 ┌──────▼──────┐
+                                 │ services/   │
+                                 │ shared      │
+                                 └──────┬──────┘
+                                        │
+                                 ┌──────▼──────┐
+                                 │  MySQL 8.0  │
+                                 │  Port: 3308 │
+                                 └─────────────┘
+```
 
-# 2) CHẠY CHẾ ĐỘ DEBUG (CHO DEVELOPER NÂNG CAO) 🔍
-# --------------------------------------------------
-# 2.1) Build & up (Debug Mode):
-#   docker compose -f docker-compose.debug.yaml up -d --build
-#   # Đặc điểm: LOG_LEVEL=DEBUG, DEBUG=true, Hot-reload
-#
-# 2.2) Logs chi tiết (NHIỀU thông tin):
-#   docker compose -f docker-compose.debug.yaml logs -f api
-#   # Sẽ thấy: SQL queries, connection details, stack traces
-#
-# 2.3) Hot-reload:
-#   # Sửa file .py → Container tự động restart
-#   # Không cần rebuild image
-#
-# 2.4) Down:
-#   docker compose -f docker-compose.debug.yaml down
+## 🌐 Service Endpoints Summary
+- **API Documentation**: http://localhost:8136/docs
+- **HTTPS API**: https://localhost:8118/docs (full version only)
+- **Object Detection**: http://localhost:8100/healthz
+- **Database**: localhost:3308 (MySQL)
+- **WebSocket**: ws://localhost:8136/ws/...
 
-# 2) CHẠY TỪNG MODULE RIÊNG BẰNG DOCKER (KHI DB ĐÃ CHẠY SẴN)
-# -----------------------------------------------------------
-# 2.1) API:
-#   docker build -f services/api/Dockerfile -t ass-api .
-#   docker run --rm -p 8000:8000 \
-#     -e DB_HOST=<db_host> -e DB_PORT=3306 \
-#     -e DB_USER=<user>   -e DB_PASSWORD=<pass> -e DB_NAME=<db> \
-#     ass-api
-#
-# 2.2) Detector:
-#   docker build -f services/detector/Dockerfile -t ass-detector .
-#   docker run --rm -p 8100:8100 \
-#     -e MODEL_PATH=/app/services/detector/models/my_model.pt \
-#     ass-detector
+## 📁 Project Structure Overview
+```
+ASS_server/
+├── .env                           # ⭐ IPv4 configuration for nginx
+├── docker.ps1                    # ⭐ Automated management script
+├── docker-compose.yaml           # Full production setup (nginx+SSL)
+├── docker-compose.simple.yaml    # Simple development setup
+├── README.md / README_vietsub.md  # Complete documentation
+├── lib_requirement.txt           # Dependencies reference
+├── nginx/                        # Nginx configuration & SSL
+├── db/                           # Database schema & sample data
+└── services/
+    ├── api/                      # FastAPI REST API service
+    ├── detector/                 # YOLOv8 detection service
+    └── shared/                   # ⭐ Database access layer
+```
 
-# 3) CHẠY KHÔNG QUA DOCKER — DÙNG VENV "my_env"
-# ----------------------------------------------
-# 3.1) Tạo & kích hoạt venv (chọn MỘT trong hai cách):
-#   # Windows PowerShell
-#   py -3.11 -m venv my_env
-#   .\my_env\Scripts\Activate.ps1
-#
-#   # macOS/Linux/WSL
-#   python3.11 -m venv my_env
-#   source my_env/bin/activate
-#
-# 3.2) Cài thư viện:
-#   pip install --upgrade pip
-#   pip install -r lib_requirements
-#   # Lưu ý torch CPU: nếu pip báo lỗi, cài theo hướng dẫn PyTorch chính thức (CPU wheel).
-#
-# 3.3) Chạy MySQL:
-#   # Khuyến nghị vẫn chạy DB bằng container:
-#   docker run -d --name ass-mysql -p 3308:3306 -e MYSQL_ROOT_PASSWORD=secret mysql:8
-#   # Import schema & seed:
-#   mysql -h 127.0.0.1 -P 3308 -u root -psecret < 001_schema.sql
-#   mysql -h 127.0.0.1 -P 3308 -u root -psecret < 002_insert.sql
-#
-# 3.4) Chạy API (local):
-#   set DB_HOST=127.0.0.1        # Windows CMD
-#   set DB_PORT=3308
-#   set DB_USER=root
-#   set DB_PASSWORD=secret
-#   set DB_NAME=iotc25_advanced_support_squad
-#   uvicorn services.api.server:app --reload --port 8000
-#   # PowerShell: $env:DB_HOST="127.0.0.1" ... ; macOS/Linux: export DB_HOST=...
-#
-# 3.5) Chạy Detector (local):
-#   set MODEL_PATH=services/detector/models/my_model.pt
-#   uvicorn services.detector.app:app --reload --port 8100
-#
-# 3.6) Kiểm tra nhanh:
-#   curl http://127.0.0.1:8000/healthz
-#   curl http://127.0.0.1:8100/healthz
+## ⚙️ Initial Configuration
 
-# 4) CHẾ ĐỘ HỖN HỢP (MIXED)
-# --------------------------
-# - DB chạy trong Docker; API & Detector chạy bằng venv "my_env".
-# - Ưu điểm: debug code nhanh, không rebuild image; vẫn giữ DB cô lập.
-# - Lưu ý: dùng DB_PORT=3308 khi kết nối tới container MySQL đã publish.
+### IPv4 Configuration (.env file)
+**CRITICAL**: Configure your network IP address in `.env` file:
 
-# 5) TRUY CẬP TỪ MÁY KHÁC CÙNG MẠNG (LAN)
-# ---------------------------------------
-# - Lấy IP máy chạy dịch vụ (ipconfig/ifconfig).
-# - Mở firewall inbound TCP cho 8000 (API) và 8100 (Detector).
-# - Máy khác gọi:
-#   http://<HOST_IP>:8000/docs
-#   http://<HOST_IP>:8100/image?cart_id=142
+```bash
+# Edit ASS_server\.env
+SERVER_IP=192.168.1.100  # Replace with your actual IP
 
-# 6) VẤN ĐỀ THƯỜNG GẶP
-# --------------------
-# - ModuleNotFoundError: No module named 'services.shared'
-#   => thiếu __init__.py, chưa COPY shared/ vào image, hoặc PYTHONPATH sai.
-# - API không kết nối DB:
-#   => sai ENV DB_*; DB chưa khởi tạo schema/seed; port mapping 3308:3306 chưa đúng.
-# - Detector không có ảnh (/image 404):
-#   => URL camera lỗi/chậm; chờ vài giây để thread nạp frame; kiểm tra CARTS trong config.py.
-# - Torch/Ultralytics cài khó:
-#   => dùng Docker cho detector; nếu venv: cài torch CPU theo hướng dẫn chính thức (không bắt buộc GPU).
+# Other important settings:
+MYSQL_ROOT_PASSWORD=123456789
+MYSQL_DATABASE=iotc25_advanced_support_squad
+MYSQL_USER=eggien
+MYSQL_PASSWORD=0363802865
+API_PORT=8136
+CACHE_ENABLED=true
+```
+
+**IPv4 Setup Instructions:**
+1. Find your IP: `ipconfig` (Windows) or `ip addr` (Linux)
+2. Edit `.env` file with your IP address
+3. Restart services after IP change: `docker-compose down && docker-compose up -d`
+4. SSL certificates auto-regenerate with new IP
+
+### Prerequisites Check
+```bash
+# Check Docker installation
+docker --version          # Should be 20.10+
+docker-compose --version  # Should be 2.0+
+
+# Check PowerShell (Windows)
+$PSVersionTable.PSVersion # Should be 5.1+
+
+# Check available ports
+netstat -an | findstr ":8136"  # Should be empty
+netstat -an | findstr ":8118"  # Should be empty
+netstat -an | findstr ":8100"  # Should be empty
+netstat -an | findstr ":3308"  # Should be empty
+```
+
+## 🚀 Method 1: PowerShell Script (docker.ps1) - RECOMMENDED
+
+**Best for**: Production-like development and quick deployment
+
+### Available Commands:
+```powershell
+# Start full version (nginx + SSL + HTTPS)
+.\docker.ps1 full
+
+# Start simple version (HTTP only, faster startup)
+.\docker.ps1 simple
+
+# Stop all services
+.\docker.ps1 down
+
+# Restart current configuration
+.\docker.ps1 restart
+
+# View nginx proxy logs
+.\docker.ps1 logs
+
+# Check container status
+.\docker.ps1 status
+
+# Show help
+.\docker.ps1
+```
+
+### Full Version vs Simple Version:
+
+#### Full Version (.\docker.ps1 full)
+- **Features**: Nginx proxy, SSL/TLS, HTTPS support, production-ready
+- **Ports**: HTTP (8136), HTTPS (8118), Detection (8100), DB (3308)
+- **Use when**: Production deployment, testing SSL, external access needed
+- **Startup time**: ~60-90 seconds (SSL certificate generation)
+- **Memory usage**: ~2-3GB RAM
+- **URL**: https://localhost:8118/docs (HTTPS) or http://localhost:8136/docs
+
+#### Simple Version (.\docker.ps1 simple)
+- **Features**: Direct API access, HTTP only, faster development
+- **Ports**: HTTP (8136), Detection (8100), DB (3308)
+- **Use when**: Local development, testing, debugging
+- **Startup time**: ~30-45 seconds
+- **Memory usage**: ~1.5-2GB RAM
+- **URL**: http://localhost:8136/docs
+
+### Step-by-Step Execution:
+```powershell
+# Navigate to project directory
+cd "C:\Users\Admin\Project\IoTc25\project\Server\ASS_server"
+
+# For development
+.\docker.ps1 simple
+# Wait for "SIMPLE Services started!" message
+# Open: http://localhost:8136/docs
+
+# For production testing
+.\docker.ps1 down        # Stop simple version first
+.\docker.ps1 full
+# Wait for "FULL Services started!" message
+# Open: https://localhost:8118/docs (HTTPS)
+# Or:   http://localhost:8136/docs (HTTP)
+```
+
+## 🐳 Method 2: Docker Command Line - Manual Control
+
+**Best for**: Understanding Docker internals, debugging, custom configurations
+
+### Simple Version (HTTP only):
+```bash
+# Start simple version
+docker-compose -f docker-compose.simple.yaml up -d --remove-orphans
+
+# View logs
+docker-compose -f docker-compose.simple.yaml logs -f
+
+# Stop
+docker-compose -f docker-compose.simple.yaml down --remove-orphans
+
+# Rebuild and start
+docker-compose -f docker-compose.simple.yaml up -d --build --remove-orphans
+```
+
+### Full Version (Nginx + SSL):
+```bash
+# Start full version
+docker-compose up -d --remove-orphans
+
+# View logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f api
+docker-compose logs -f detector
+docker-compose logs -f nginx-proxy
+docker-compose logs -f db
+
+# Stop
+docker-compose down --remove-orphans
+
+# Complete rebuild
+docker-compose down --remove-orphans
+docker-compose build --no-cache
+docker-compose up -d --remove-orphans
+```
+
+### Advanced Docker Commands:
+```bash
+# Scale detector service (multiple instances)
+docker-compose up -d --scale detector=2
+
+# Build specific service
+docker-compose build api
+docker-compose build detector
+
+# Force recreate containers
+docker-compose up -d --force-recreate
+
+# Remove everything including volumes
+docker-compose down -v --remove-orphans
+docker system prune -a --volumes
+
+# Check container health
+docker-compose ps
+docker inspect <container_name>
+```
+
+## 🖥️ Method 3: Docker Desktop - GUI Management
+
+**Best for**: Visual container management, beginners, monitoring resource usage
+
+### Setup Steps:
+1. **Install Docker Desktop** from https://www.docker.com/products/docker-desktop
+2. **Open Docker Desktop** application
+3. **Navigate to project folder** in terminal
+4. **Import Compose file**:
+   - Click "Containers" tab
+   - Click "Create container"
+   - Select "From existing compose file"
+   - Browse to `docker-compose.yaml` or `docker-compose.simple.yaml`
+
+### Using Docker Desktop GUI:
+1. **Start Services**:
+   - Select compose project
+   - Click green "Start" button
+   - Monitor startup logs in real-time
+
+2. **Monitor Resources**:
+   - View CPU/Memory usage per container
+   - Check container health status
+   - Monitor network traffic
+
+3. **Debug Issues**:
+   - Click container name to view logs
+   - Use "Exec" tab to access container shell
+   - View file system in "Files" tab
+
+4. **Stop Services**:
+   - Click red "Stop" button for entire stack
+   - Or stop individual containers
+
+### Docker Desktop Advantages:
+- Visual resource monitoring
+- Easy log browsing
+- One-click container access
+- Volume and network management
+- Image management interface
+
+## 💻 Method 4: VS Code Docker Extension
+
+**Best for**: Integrated development, debugging, live coding
+
+### Setup VS Code Environment:
+1. **Install Extensions**:
+   ```
+   - Docker (ms-azuretools.vscode-docker)
+   - Python (ms-python.python)
+   - FastAPI (optional: FastAPI syntax highlighting)
+   ```
+
+2. **Open Project**:
+   ```bash
+   code "C:\Users\Admin\Project\IoTc25\project\Server\ASS_server"
+   ```
+
+### Using VS Code Docker Integration:
+
+#### Starting Services:
+1. **Open Command Palette** (Ctrl+Shift+P)
+2. **Type**: "Docker Compose: Up"
+3. **Select compose file**:
+   - `docker-compose.simple.yaml` (development)
+   - `docker-compose.yaml` (production)
+
+#### Development Workflow:
+1. **Edit Code** in VS Code
+2. **Rebuild Service**:
+   - Right-click service in Docker panel
+   - Select "Compose Restart"
+   - Or use Command Palette: "Docker Compose: Restart"
+
+3. **Debug APIs**:
+   - Use VS Code REST Client extension
+   - Create `.http` files for API testing
+   - Attach debugger to running containers
+
+#### VS Code Docker Panel:
+- **Containers**: View running containers, logs, exec into shell
+- **Images**: Manage Docker images, view layers
+- **Networks**: Monitor Docker networks
+- **Volumes**: Inspect data volumes
+
+### Development Tips:
+```json
+// .vscode/settings.json
+{
+    "python.defaultInterpreterPath": "./ASS_env/Scripts/python.exe",
+    "docker.attachShellCommand.linuxContainer": "/bin/bash",
+    "docker.attachShellCommand.windowsContainer": "powershell"
+}
+```
+
+## 🐍 Method 5: Virtual Environment (my_env) - Local Development
+
+**Best for**: Pure Python development, library testing, debugging without Docker overhead
+
+### Prerequisites:
+- Python 3.11+
+- MySQL 8.0 server running locally
+- All system dependencies installed manually
+
+### Setup Virtual Environment:
+```bash
+# Create virtual environment
+python -m venv my_env
+
+# Activate virtual environment
+# Windows:
+my_env\Scripts\activate
+# Linux/Mac:
+source my_env/bin/activate
+
+# Upgrade pip
+python -m pip install --upgrade pip
+
+# Install dependencies
+pip install -r lib_requirement.txt
+
+# Special PyTorch CPU-only installation
+pip uninstall torch torchvision -y
+pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
+
+# Verify PyTorch CPU-only
+python -c "import torch; print('CUDA available:', torch.cuda.is_available())"
+# Should output: CUDA available: False
+```
+
+### Database Setup (Local MySQL):
+```sql
+-- Connect to MySQL as root
+mysql -u root -p
+
+-- Create database and user
+CREATE DATABASE iotc25_advanced_support_squad;
+CREATE USER 'eggien'@'localhost' IDENTIFIED BY '0363802865';
+GRANT ALL PRIVILEGES ON iotc25_advanced_support_squad.* TO 'eggien'@'localhost';
+FLUSH PRIVILEGES;
+
+-- Import schema
+mysql -u eggien -p0363802865 iotc25_advanced_support_squad < db/db_init/001_schema.sql
+
+-- Import sample data
+mysql -u eggien -p0363802865 iotc25_advanced_support_squad < db/db_insert/002_insert_product_master.sql
+mysql -u eggien -p0363802865 iotc25_advanced_support_squad < db/db_insert/003_insert_cart_items.sql
+# ... continue with other insert files
+```
+
+### Running Services Manually:
+
+#### Start API Service:
+```bash
+# Terminal 1 - API Service
+cd services/api
+uvicorn server:app --host 0.0.0.0 --port 8136 --reload
+
+# Access: http://localhost:8136/docs
+```
+
+#### Start Detector Service:
+```bash
+# Terminal 2 - Detector Service  
+cd services/detector
+uvicorn app:app --host 0.0.0.0 --port 8100 --reload
+
+# Access: http://localhost:8100/healthz
+```
+
+### Environment Variables for Local Dev:
+```bash
+# Set environment variables
+export DB_HOST=localhost
+export DB_PORT=3306
+export DB_USER=eggien
+export DB_PASSWORD=0363802865
+export DB_NAME=iotc25_advanced_support_squad
+export API_PORT=8136
+export CACHE_ENABLED=false
+```
+
+### Virtual Environment Advantages:
+- Direct Python debugging
+- Hot reload during development
+- Easier library testing
+- Lower resource usage
+- Direct file system access
+
+### Virtual Environment Disadvantages:
+- Manual dependency management
+- No nginx proxy/SSL
+- Database setup complexity
+- Environment inconsistencies
+
+## 🌐 Method 6: Production Deployment
+
+**Best for**: Live production servers, cloud deployment, enterprise environments
+
+### Production Environment Setup:
+
+#### Server Requirements:
+- **OS**: Ubuntu 20.04+ or CentOS 8+ or Windows Server 2019+
+- **CPU**: 4+ cores (8+ recommended)
+- **RAM**: 8GB+ (16GB+ recommended)
+- **Storage**: 50GB+ SSD
+- **Network**: Static IP address, ports 80/443/8136/8118 accessible
+
+#### Production Configuration:
+
+1. **Update .env for Production**:
+```bash
+# Production .env
+SERVER_IP=your.production.ip.address
+MYSQL_ROOT_PASSWORD=very_secure_root_password
+MYSQL_DATABASE=iotc25_production
+MYSQL_USER=production_user
+MYSQL_PASSWORD=very_secure_user_password
+API_PORT=8136
+CACHE_ENABLED=true
+```
+
+2. **SSL Certificate Configuration**:
+```bash
+# Option 1: Auto-generated certificates (development/testing)
+# Certificates auto-generate with IP from .env
+
+# Option 2: Custom SSL certificates (production)
+# Place certificates in nginx/certs/
+cp your-domain.crt nginx/certs/cert.pem
+cp your-domain.key nginx/certs/key.pem
+```
+
+3. **Production Docker Compose**:
+```yaml
+# docker-compose.prod.yaml
+version: '3.8'
+services:
+  api:
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    restart: always
+    
+  detector:
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    restart: always
+```
+
+### Production Deployment Steps:
+
+#### Cloud Deployment (AWS/Azure/GCP):
+```bash
+# 1. Clone repository on production server
+git clone <repository-url>
+cd ASS_server
+
+# 2. Configure environment
+vim .env  # Update with production values
+
+# 3. Deploy with production compose
+docker-compose -f docker-compose.prod.yaml up -d
+
+# 4. Setup reverse proxy (if needed)
+# Configure your cloud load balancer to point to ports 8136/8118
+
+# 5. Setup monitoring
+docker-compose logs -f
+```
+
+#### On-Premises Deployment:
+```bash
+# 1. Ensure Docker is installed on production server
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+
+# 2. Install Docker Compose
+curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+
+# 3. Deploy application
+git clone <repository-url>
+cd ASS_server
+docker-compose up -d
+
+# 4. Setup systemd service (Linux)
+sudo vim /etc/systemd/system/shopping-cart.service
+sudo systemctl enable shopping-cart.service
+sudo systemctl start shopping-cart.service
+```
+
+### Production Monitoring:
+```bash
+# Health checks
+curl https://your-domain.com/healthz
+curl https://your-domain.com:8100/healthz
+
+# Resource monitoring
+docker stats
+docker-compose ps
+
+# Log monitoring
+docker-compose logs -f --tail=100
+
+# Database backup
+docker exec shopping-cart-db-1 mysqldump -u root -p \
+  iotc25_production > backup_$(date +%Y%m%d).sql
+```
+
+## 🔍 Troubleshooting Guide
+
+### Common Issues and Solutions:
+
+#### Port Conflicts:
+```bash
+# Problem: Port already in use
+# Solution: Check and kill processes
+netstat -ano | findstr ":8136"
+taskkill /PID <process_id> /F  # Windows
+kill -9 <process_id>           # Linux
+
+# Or use different ports in .env
+```
+
+#### Docker Issues:
+```bash
+# Problem: Docker containers won't start
+# Solution: Clean Docker environment
+docker-compose down -v --remove-orphans
+docker system prune -a --volumes
+docker network prune
+.\docker.ps1 simple  # Restart
+```
+
+#### SSL Certificate Issues:
+```bash
+# Problem: HTTPS not working
+# Solution: Regenerate certificates
+docker-compose restart nginx-proxy
+
+# Check certificate details
+docker exec ass_server-nginx-proxy-1 \
+  openssl x509 -in /etc/nginx/certs/cert.pem -text -noout
+```
+
+#### Database Connection Issues:
+```bash
+# Problem: Can't connect to database
+# Solution: Check database health
+docker exec ass_server-db-1 mysqladmin ping -u eggien -p0363802865
+
+# Reset database
+docker-compose down -v
+docker-compose up -d db
+# Wait for database to be ready, then start other services
+```
+
+#### Performance Issues:
+```bash
+# Problem: Slow response times
+# Solution: Check resource usage
+docker stats
+
+# Scale services
+docker-compose up -d --scale api=2 --scale detector=2
+
+# Enable caching
+# Edit .env: CACHE_ENABLED=true
+```
+
+#### Network Issues:
+```bash
+# Problem: Services can't communicate
+# Solution: Check Docker networks
+docker network ls
+docker network inspect ass_server_default
+
+# Restart networking
+docker-compose down
+docker-compose up -d
+```
+
+## 🎯 When to Use Each Method
+
+### Use Virtual Environment (my_env) when:
+- ✅ Developing/debugging Python code directly
+- ✅ Testing library compatibility
+- ✅ Learning system internals
+- ❌ Not suitable for production
+- ❌ Requires manual database setup
+
+### Use docker.ps1 Script when:
+- ✅ Quick development/testing
+- ✅ Standardized deployment
+- ✅ Non-technical users
+- ✅ Production-like testing
+- ❌ Limited customization options
+
+### Use Docker Command Line when:
+- ✅ Custom configurations needed
+- ✅ CI/CD pipeline integration
+- ✅ Debugging container issues
+- ✅ Advanced Docker features
+- ❌ More complex for beginners
+
+### Use Docker Desktop when:
+- ✅ Visual container management
+- ✅ Resource monitoring needed
+- ✅ GUI preference
+- ✅ Learning Docker concepts
+- ❌ Limited automation capabilities
+
+### Use VS Code Integration when:
+- ✅ Active development workflow
+- ✅ Integrated debugging needed
+- ✅ Code editing + container management
+- ✅ Team development
+- ❌ Requires VS Code setup
+
+### Use Production Deployment when:
+- ✅ Live production environment
+- ✅ High availability required
+- ✅ SSL/security needed
+- ✅ Scalability required
+- ❌ More complex setup
+
+## 📊 Performance Optimization Tips
+
+### For Development:
+```bash
+# Use simple version for faster startup
+.\docker.ps1 simple
+
+# Disable caching for development
+# .env: CACHE_ENABLED=false
+
+# Use fewer workers
+# docker-compose.yaml: UVICORN_WORKERS=1
+```
+
+### For Production:
+```bash
+# Enable caching
+# .env: CACHE_ENABLED=true
+
+# Scale services based on load
+docker-compose up -d --scale api=3 --scale detector=2
+
+# Use production-optimized images
+# Consider multi-stage Docker builds
+```
+
+## 📞 Support and Maintenance
+
+### Regular Maintenance:
+```bash
+# Weekly cleanup
+docker system prune -f
+docker volume prune -f
+
+# Update containers
+docker-compose pull
+docker-compose up -d --build
+
+# Database backup
+./scripts/backup.sh --weekly
+```
+
+### Getting Help:
+- Check logs: `.\docker.ps1 logs` or `docker-compose logs -f`
+- Health checks: Visit `/healthz` endpoints
+- Documentation: See README.md files
+- Community: Check project repository issues
+
+---
+
+**Last Updated**: September 13, 2025  
+**Version**: 2.0 with comprehensive deployment options  
+**Team**: Advanced Support Squad  
+**Competition**: IoT Challenge 2025 "Edge AI for smart retail"

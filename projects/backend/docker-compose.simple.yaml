@@ -2,7 +2,7 @@ services:
   db:
     image: mysql:8.0
     restart: unless-stopped
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password --character-set-client-handshake=FALSE --init-connect='SET NAMES utf8mb4'
     environment:
       - MYSQL_ROOT_PASSWORD=123456789
       - MYSQL_DATABASE=iotc25_advanced_support_squad
@@ -17,11 +17,7 @@ services:
       - ./db/db_insert/003_insert_cart_items.sql:/docker-entrypoint-initdb.d/003_insert_cart_items.sql:ro
       - ./db/db_insert/004_insert_cart_config.sql:/docker-entrypoint-initdb.d/004_insert_cart_config.sql:ro
       - ./db/db_insert/005_insert_map_beacon.sql:/docker-entrypoint-initdb.d/005_insert_map_beacon.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      - ./db/db_insert/006_insert_map.sql:/docker-entrypoint-initdb.d/006_insert_map.sql:ro
 
   api:
     build:
@@ -37,10 +33,9 @@ services:
       - API_PORT=8136
       - CACHE_ENABLED=false
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     ports:
-      - "8136:8136"
+      - "8136:8136"  # Direct access - no nginx proxy
 
   detector:
     build:

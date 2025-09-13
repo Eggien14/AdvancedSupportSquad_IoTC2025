@@ -39,22 +39,31 @@ CREATE TABLE IF NOT EXISTS cart_items (
 
 -- Bảng cấu hình cart: thông tin BLE và camera cho từng cart
 CREATE TABLE IF NOT EXISTS cart_config (
-  cart_id           BIGINT          NOT NULL PRIMARY KEY,
-  cart_position     VARCHAR(36)     NULL COMMENT 'UUID BLE cho position',
-  cart_state        VARCHAR(36)     NULL COMMENT 'UUID BLE cho state', 
-  cart_voice_cmd    VARCHAR(36)     NULL COMMENT 'UUID BLE cho voice command',
-  cart_ota          VARCHAR(36)     NULL COMMENT 'UUID BLE cho OTA',
-  cam_stream_url    VARCHAR(512)    NULL COMMENT 'URL stream camera'
+  cart_id                BIGINT          NOT NULL PRIMARY KEY,
+  cart_mac_address       VARCHAR(17)     NULL COMMENT 'Địa chỉ MAC của cart (AA:BB:CC:DD:EE:FF)',
+  cart_position          VARCHAR(36)     NULL COMMENT 'UUID BLE cho position',
+  cart_state             VARCHAR(36)     NULL COMMENT 'UUID BLE cho state', 
+  cart_voice_cmd         VARCHAR(36)     NULL COMMENT 'UUID BLE cho voice command',
+  cart_firmware_update   VARCHAR(36)     NULL COMMENT 'UUID BLE cho firmware update',
+  cam_stream_url         VARCHAR(512)    NULL COMMENT 'URL stream camera'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Bảng map beacon: thông tin vị trí và cấu hình beacon cho định vị
 CREATE TABLE IF NOT EXISTS map_beacon (
   map_id            BIGINT          NOT NULL,
   beacon_id         VARCHAR(10)     NOT NULL,
-  beacon_blea_uuid  VARCHAR(36)     NULL COMMENT 'UUID BLE của beacon',
+  beacon_mac_address VARCHAR(17)     NULL COMMENT 'Địa chỉ MAC của beacon (AA:BB:CC:DD:EE:FF)',
   beacon_x_coordinate DECIMAL(10,3) NULL COMMENT 'Tọa độ X của beacon',
   beacon_y_coordinate DECIMAL(10,3) NULL COMMENT 'Tọa độ Y của beacon', 
   beacon_D0         DECIMAL(6,1)    NULL COMMENT 'RSSI tại khoảng cách 1m (dBm)',
   beacon_n          DECIMAL(4,2)    NULL COMMENT 'Hệ số suy hao tín hiệu môi trường',
   PRIMARY KEY (map_id, beacon_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Bảng map: thông tin mã hóa bản đồ 10x10
+CREATE TABLE IF NOT EXISTS map (
+  map_id        BIGINT        NOT NULL,
+  x_coordinate  INT           NOT NULL,
+  y_coordinate  INT           NOT NULL,
+  area          VARCHAR(32)   DEFAULT NULL,
+  PRIMARY KEY (map_id, x_coordinate, y_coordinate)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

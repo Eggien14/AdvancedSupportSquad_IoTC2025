@@ -1,20 +1,177 @@
 # =========================================
-# lib_requirements
-# Dùng khi chạy bằng venv "my_env" (không Docker)
-# Gợi ý pin phiên bản ổn định; có thể điều chỉnh theo môi trường thực tế.
+# Smart Shopping Cart System - Library Requirements
+# IoT Challenge 2025 "Edge AI for smart retail"
+# Team: Advanced Support Squad
+# Organized by: FPT Software & Silicon Labs
 # =========================================
 
-# ---- CORE ----
-fastapi~=0.112
-uvicorn[standard]~=0.30
-pydantic~=2.8
+# IMPORTANT NOTES:
+# - This file is for REFERENCE ONLY when setting up virtual environments
+# - Docker deployments handle dependencies automatically
+# - Pin versions may need adjustment based on your environment
+# - PyTorch is installed with CPU-only support (no CUDA)
 
-# ---- DATABASE (API) ----
-PyMySQL~=1.1
+# =========================================
+# CORE WEB FRAMEWORK (Used by API & Detector Services)
+# =========================================
+fastapi==0.116.1              # Modern web framework for building APIs
+uvicorn[standard]==0.35.0      # ASGI server for serving FastAPI applications
+pydantic==2.11.7              # Data validation using Python type annotations
+pydantic-settings==2.6.1      # Settings management for Pydantic
 
-# ---- DETECTOR (CV/AI) ----
-opencv-python-headless~=4.10
-ultralytics~=8.3
-torch~=2.3  # CPU-only; nếu lỗi cài đặt, tham khảo https://pytorch.org/get-started/locally/
-numpy~=1.26
-pillow~=10.4
+# =========================================
+# DATABASE & DATA HANDLING (API Service)
+# =========================================
+PyMySQL==1.1.1                # Pure Python MySQL client library
+requests==2.31.0              # HTTP library for making requests
+websockets==12.0              # WebSocket client and server library
+
+# =========================================
+# COMPUTER VISION & AI (Detector Service)
+# =========================================
+
+# Core Computer Vision
+opencv-python-headless==4.12.0.88  # Computer vision library (headless version)
+pillow==11.3.0                     # Python Imaging Library (PIL Fork)
+numpy==2.2.6                       # Fundamental package for scientific computing
+
+# Deep Learning Framework (CPU-ONLY)
+# IMPORTANT: PyTorch is installed via Docker with specific CPU-only configuration
+# Docker command: pip install --index-url https://download.pytorch.org/whl/cpu torch
+torch~=2.3                         # PyTorch deep learning framework (CPU-only)
+torchvision~=0.18                  # Computer vision package for PyTorch (if needed)
+
+# Object Detection
+ultralytics==8.3.179              # YOLOv8 implementation and utilities
+
+# =========================================
+# SYSTEM DEPENDENCIES (Handled by Docker)
+# =========================================
+# The following are system-level dependencies automatically installed in Docker:
+# - libglib2.0-0     # GLib library for low-level core functionality
+# - libgl1           # OpenGL library for graphics rendering
+# - libgomp1         # GNU OpenMP runtime library for parallel processing
+
+# =========================================
+# DEVELOPMENT & TESTING (Optional)
+# =========================================
+pytest~=7.4                       # Testing framework
+pytest-asyncio~=0.21              # Async testing support for pytest
+httpx~=0.25                       # Async HTTP client for testing APIs
+black~=23.7                       # Code formatter
+flake8~=6.0                       # Linting tool
+mypy~=1.5                         # Static type checker
+
+# =========================================
+# PRODUCTION DEPLOYMENT (Optional)
+# =========================================
+gunicorn~=21.2                    # WSGI HTTP Server (alternative to uvicorn)
+redis~=4.6                        # Redis client for caching (if CACHE_ENABLED=true)
+
+# =========================================
+# SERVICE-SPECIFIC BREAKDOWN
+# =========================================
+
+# API SERVICE (services/api/) DEPENDENCIES:
+# - fastapi==0.116.1
+# - uvicorn==0.35.0
+# - pydantic==2.11.7
+# - pydantic-settings==2.6.1
+# - pymysql==1.1.1
+# - requests==2.31.0
+# - websockets==12.0
+
+# DETECTOR SERVICE (services/detector/) DEPENDENCIES:
+# - fastapi==0.116.1
+# - uvicorn==0.35.0
+# - numpy==2.2.6
+# - opencv-python-headless==4.12.0.88
+# - pillow==11.3.0
+# - ultralytics==8.3.179
+# - torch~=2.3 (CPU-only via Docker special installation)
+
+# SHARED SERVICES (services/shared/) DEPENDENCIES:
+# - pydantic==2.11.7
+# - pydantic-settings==2.6.1
+# - pymysql==1.1.1
+
+# NGINX PROXY DEPENDENCIES:
+# - No Python dependencies (uses official nginx:alpine Docker image)
+# - SSL certificates auto-generated via OpenSSL
+
+# DATABASE DEPENDENCIES:
+# - No Python dependencies (uses official mysql:8.0 Docker image)
+
+# =========================================
+# INSTALLATION INSTRUCTIONS FOR VIRTUAL ENV
+# =========================================
+# For local development without Docker:
+# 
+# 1. Create virtual environment:
+#    python -m venv my_env
+#    
+# 2. Activate virtual environment:
+#    # Windows:
+#    my_env\Scripts\activate
+#    # Linux/Mac:
+#    source my_env/bin/activate
+#    
+# 3. Install dependencies:
+#    pip install -r lib_requirement.txt
+#    
+# 4. For PyTorch CPU-only (manual installation):
+#    pip uninstall torch
+#    pip install --index-url https://download.pytorch.org/whl/cpu torch
+#
+# 5. Verify PyTorch CPU-only installation:
+#    python -c "import torch; print('CUDA available:', torch.cuda.is_available())"
+#    # Should print: CUDA available: False
+
+# =========================================
+# DOCKER INSTALLATION (RECOMMENDED)
+# =========================================
+# Dependencies are automatically handled by Docker:
+# - API Service: Built from services/api/Dockerfile
+# - Detector Service: Built from services/detector/Dockerfile
+# - Database: Uses official mysql:8.0 image
+# - Nginx: Uses official nginx:alpine image
+#
+# Run with Docker:
+# .\docker.ps1 simple    # HTTP-only development
+# .\docker.ps1 full      # Production with nginx+SSL
+
+# =========================================
+# VERSION COMPATIBILITY NOTES
+# =========================================
+# - Python 3.11 or higher recommended
+# - MySQL 8.0 required for database
+# - Docker 20.10+ and Docker Compose 2.0+ required
+# - Windows PowerShell 5.1+ for docker.ps1 script
+# - Nginx 1.20+ for proxy features
+
+# =========================================
+# TROUBLESHOOTING COMMON ISSUES
+# =========================================
+# 1. PyTorch CUDA conflict:
+#    Solution: Uninstall torch and reinstall with --index-url for CPU-only
+#
+# 2. OpenCV import errors:
+#    Solution: Use opencv-python-headless instead of opencv-python
+#
+# 3. MySQL connection issues:
+#    Solution: Ensure PyMySQL version matches MySQL 8.0 authentication
+#
+# 4. FastAPI uvicorn startup issues:
+#    Solution: Check if ports 8136/8100 are available
+#
+# 5. Ultralytics model download issues:
+#    Solution: Pre-download models or check internet connectivity
+
+# =========================================
+# SECURITY CONSIDERATIONS
+# =========================================
+# - Pin exact versions in production
+# - Regularly update dependencies for security patches
+# - Use Docker for isolation and consistent environments
+# - Avoid installing CUDA libraries if not needed (security & size)
+# - Consider using pip-audit for vulnerability scanning

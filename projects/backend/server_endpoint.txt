@@ -1,0 +1,834 @@
+# Smart Shopping Cart System - Complete Server Endpoints Reference
+# ==================================================================
+# IoT Challenge 2025 "Edge AI for smart retail"
+# Team: Advanced Support Squad
+# Organized by: FPT Software & Silicon Labs
+
+## 📡 Server Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Smart Shopping Cart System                   │
+│                     Server Endpoints Map                        │
+└─────────────────────────────────────────────────────────────────┘
+
+🌐 Nginx Proxy Layer (Production)
+├── 📍 HTTP:  http://localhost:8136/
+├── 📍 HTTPS: https://localhost:8118/
+└── 🔀 Routes all traffic to appropriate services
+
+🚀 API Service Layer (FastAPI)
+├── 📍 Direct: http://localhost:8136/
+├── 📍 Docs:  http://localhost:8136/docs
+├── 📍 OpenAPI: http://localhost:8136/openapi.json
+└── 📂 29 REST endpoints across 6 categories
+
+🔍 Detector Service Layer (YOLOv8)
+├── 📍 Direct: http://localhost:8100/
+├── 📍 Health: http://localhost:8100/healthz
+├── 📍 Docs:  http://localhost:8100/docs
+└── 📂 3 computer vision endpoints
+
+🗄️ Database Layer (MySQL)
+├── 📍 Direct: localhost:3308
+├── 🔐 User: eggien / Password: 0363802865
+└── 📚 Database: iotc25_advanced_support_squad
+```
+
+## 🚀 API Service Endpoints (Primary Interface)
+**Base URL**: `http://localhost:8136` (HTTP) or `https://localhost:8118` (HTTPS)
+**Framework**: FastAPI with automatic OpenAPI documentation
+
+### 📱 1. Health Check & System Status
+
+#### GET /healthz
+**Purpose**: System health monitoring and uptime verification
+**URL**: `http://localhost:8136/healthz`
+**Method**: GET
+**Authentication**: None required
+**Response Format**: JSON
+
+**Response Examples**:
+```json
+// Healthy system
+{
+  "status": "ok",
+  "timestamp": "2024-09-13T10:30:45.123Z",
+  "services": {
+    "database": "connected",
+    "cache": "enabled",
+    "detector": "available"
+  },
+  "version": "1.0.0"
+}
+
+// Unhealthy system
+{
+  "status": "error",
+  "timestamp": "2024-09-13T10:30:45.123Z",
+  "services": {
+    "database": "disconnected",
+    "cache": "disabled",
+    "detector": "unavailable"
+  },
+  "errors": ["Database connection timeout", "Detector service unreachable"]
+}
+```
+
+**Use Cases**:
+- Load balancer health checks
+- Monitoring system integration
+- Service startup verification
+- CI/CD pipeline health verification
+
+---
+
+### 🛒 2. Shopping Cart Management (6 endpoints)
+
+#### GET /carts
+**Purpose**: Retrieve all active shopping carts with filtering options
+**URL**: `http://localhost:8136/carts`
+**Method**: GET
+**Authentication**: None (public access)
+**Query Parameters**:
+- `skip` (int, optional): Number of records to skip (default: 0)
+- `limit` (int, optional): Maximum records to return (default: 100)
+- `status` (string, optional): Filter by cart status ("active", "completed", "cancelled")
+
+**Response Example**:
+```json
+{
+  "carts": [
+    {
+      "cart_id": 1,
+      "status": "active",
+      "created_at": "2024-09-13T09:15:30Z",
+      "updated_at": "2024-09-13T10:20:15Z",
+      "total_items": 3,
+      "total_amount": 127.50,
+      "items": [
+        {
+          "item_id": 1,
+          "product_name": "Apple iPhone 15",
+          "quantity": 1,
+          "unit_price": 999.00,
+          "total_price": 999.00
+        }
+      ]
+    }
+  ],
+  "total_count": 15,
+  "has_next": true
+}
+```
+
+#### POST /carts
+**Purpose**: Create a new shopping cart
+**URL**: `http://localhost:8136/carts`
+**Method**: POST
+**Content-Type**: application/json
+
+**Request Body**:
+```json
+{
+  "cart_name": "Customer Cart #1",
+  "initial_items": [
+    {
+      "product_id": 101,
+      "quantity": 2
+    }
+  ]
+}
+```
+
+**Response Example**:
+```json
+{
+  "cart_id": 1,
+  "status": "active",
+  "created_at": "2024-09-13T10:30:45Z",
+  "message": "Cart created successfully"
+}
+```
+
+#### GET /carts/{cart_id}
+**Purpose**: Retrieve specific cart details by ID
+**URL**: `http://localhost:8136/carts/{cart_id}`
+**Method**: GET
+**Path Parameters**:
+- `cart_id` (int): Unique cart identifier
+
+**Response Example**:
+```json
+{
+  "cart_id": 1,
+  "status": "active",
+  "created_at": "2024-09-13T09:15:30Z",
+  "updated_at": "2024-09-13T10:20:15Z",
+  "items": [
+    {
+      "item_id": 1,
+      "product_id": 101,
+      "product_name": "Apple iPhone 15",
+      "quantity": 1,
+      "unit_price": 999.00,
+      "total_price": 999.00,
+      "added_at": "2024-09-13T09:15:30Z"
+    }
+  ],
+  "total_items": 1,
+  "total_amount": 999.00
+}
+```
+
+#### PUT /carts/{cart_id}
+**Purpose**: Complete cart update with multiple operation modes
+**URL**: `http://localhost:8136/carts/{cart_id}`
+**Method**: PUT
+**Content-Type**: application/json
+
+**Advanced Update Modes**:
+
+1. **Replace Mode** (Complete replacement):
+```json
+{
+  "mode": "replace",
+  "items": [
+    {"product_id": 101, "quantity": 3},
+    {"product_id": 102, "quantity": 1}
+  ]
+}
+```
+
+2. **Merge Mode** (Add/update items, keep existing):
+```json
+{
+  "mode": "merge",
+  "items": [
+    {"product_id": 103, "quantity": 2}
+  ]
+}
+```
+
+3. **Delta Mode** (Increment/decrement quantities):
+```json
+{
+  "mode": "delta",
+  "changes": [
+    {"product_id": 101, "quantity_change": +2},
+    {"product_id": 102, "quantity_change": -1}
+  ]
+}
+```
+
+#### DELETE /carts/{cart_id}
+**Purpose**: Delete/cancel a shopping cart
+**URL**: `http://localhost:8136/carts/{cart_id}`
+**Method**: DELETE
+
+**Response Example**:
+```json
+{
+  "message": "Cart deleted successfully",
+  "cart_id": 1,
+  "deleted_at": "2024-09-13T10:30:45Z"
+}
+```
+
+#### POST /carts/{cart_id}/checkout
+**Purpose**: Process cart checkout and payment
+**URL**: `http://localhost:8136/carts/{cart_id}/checkout`
+**Method**: POST
+**Content-Type**: application/json
+
+**Request Body**:
+```json
+{
+  "payment_method": "credit_card",
+  "customer_info": {
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "+1234567890"
+  },
+  "shipping_address": {
+    "street": "123 Main St",
+    "city": "Anytown",
+    "zip": "12345"
+  }
+}
+```
+
+**Response Example**:
+```json
+{
+  "order_id": "ORD-2024-001",
+  "cart_id": 1,
+  "status": "completed",
+  "total_amount": 999.00,
+  "payment_status": "paid",
+  "estimated_delivery": "2024-09-15T00:00:00Z",
+  "tracking_number": "TRK123456789"
+}
+```
+
+---
+
+### 📦 3. Product Management (8 endpoints)
+
+#### GET /products
+**Purpose**: Retrieve product catalog with advanced filtering
+**URL**: `http://localhost:8136/products`
+**Method**: GET
+**Query Parameters**:
+- `skip` (int): Pagination offset (default: 0)
+- `limit` (int): Records per page (default: 100)
+- `category` (string): Filter by product category
+- `search` (string): Text search in name/description
+- `min_price` (float): Minimum price filter
+- `max_price` (float): Maximum price filter
+- `in_stock` (bool): Filter by availability
+
+**Example URLs**:
+- All products: `/products`
+- Electronics only: `/products?category=electronics`
+- Price range: `/products?min_price=100&max_price=500`
+- Search: `/products?search=iphone&in_stock=true`
+
+#### GET /products/{product_id}
+**Purpose**: Get detailed product information
+**URL**: `http://localhost:8136/products/{product_id}`
+**Method**: GET
+
+**Response Example**:
+```json
+{
+  "product_id": 101,
+  "name": "Apple iPhone 15",
+  "description": "Latest iPhone with advanced features",
+  "category": "electronics",
+  "price": 999.00,
+  "stock_quantity": 150,
+  "image_url": "/images/products/iphone15.jpg",
+  "specifications": {
+    "storage": "128GB",
+    "color": "Midnight Black",
+    "screen_size": "6.1 inch"
+  },
+  "created_at": "2024-01-15T00:00:00Z",
+  "updated_at": "2024-09-13T10:30:45Z"
+}
+```
+
+#### POST /products
+**Purpose**: Add new product to catalog (Admin only)
+**URL**: `http://localhost:8136/products`
+**Method**: POST
+**Content-Type**: application/json
+
+**Request Body**:
+```json
+{
+  "name": "Samsung Galaxy S24",
+  "description": "Flagship Android smartphone",
+  "category": "electronics",
+  "price": 899.00,
+  "stock_quantity": 100,
+  "specifications": {
+    "storage": "256GB",
+    "color": "Titanium Gray"
+  }
+}
+```
+
+#### PUT /products/{product_id}
+**Purpose**: Update existing product information
+**URL**: `http://localhost:8136/products/{product_id}`
+**Method**: PUT
+
+#### DELETE /products/{product_id}
+**Purpose**: Remove product from catalog
+**URL**: `http://localhost:8136/products/{product_id}`
+**Method**: DELETE
+
+#### GET /products/categories
+**Purpose**: Get all available product categories
+**URL**: `http://localhost:8136/products/categories`
+**Method**: GET
+
+**Response Example**:
+```json
+{
+  "categories": [
+    {"name": "electronics", "count": 45},
+    {"name": "clothing", "count": 120},
+    {"name": "home", "count": 78}
+  ]
+}
+```
+
+#### POST /products/{product_id}/upload-image
+**Purpose**: Upload product image
+**URL**: `http://localhost:8136/products/{product_id}/upload-image`
+**Method**: POST
+**Content-Type**: multipart/form-data
+
+#### GET /products/search/suggestions
+**Purpose**: Get search suggestions for autocomplete
+**URL**: `http://localhost:8136/products/search/suggestions`
+**Method**: GET
+**Query Parameters**:
+- `q` (string): Search query prefix
+
+---
+
+### 📊 4. Inventory Management (5 endpoints)
+
+#### GET /inventory
+**Purpose**: Get current inventory levels across all products
+**URL**: `http://localhost:8136/inventory`
+**Method**: GET
+
+#### POST /inventory/update
+**Purpose**: Update stock quantities (bulk operation)
+**URL**: `http://localhost:8136/inventory/update`
+**Method**: POST
+
+**Request Body**:
+```json
+{
+  "updates": [
+    {"product_id": 101, "quantity_change": -5, "reason": "sale"},
+    {"product_id": 102, "quantity_change": +20, "reason": "restock"}
+  ]
+}
+```
+
+#### GET /inventory/{product_id}/history
+**Purpose**: Get inventory change history for specific product
+**URL**: `http://localhost:8136/inventory/{product_id}/history`
+**Method**: GET
+
+#### POST /inventory/alerts
+**Purpose**: Set up low-stock alerts
+**URL**: `http://localhost:8136/inventory/alerts`
+**Method**: POST
+
+#### GET /inventory/low-stock
+**Purpose**: Get products with low inventory levels
+**URL**: `http://localhost:8136/inventory/low-stock`
+**Method**: GET
+
+---
+
+### 📈 5. Analytics & Reporting (5 endpoints)
+
+#### GET /analytics/sales
+**Purpose**: Get sales analytics and reports
+**URL**: `http://localhost:8136/analytics/sales`
+**Method**: GET
+**Query Parameters**:
+- `start_date` (string): Start date (ISO format)
+- `end_date` (string): End date (ISO format)
+- `granularity` (string): "daily", "weekly", "monthly"
+
+#### GET /analytics/products/popular
+**Purpose**: Get most popular products
+**URL**: `http://localhost:8136/analytics/products/popular`
+**Method**: GET
+
+#### GET /analytics/carts/abandonment
+**Purpose**: Analyze cart abandonment rates
+**URL**: `http://localhost:8136/analytics/carts/abandonment`
+**Method**: GET
+
+#### GET /analytics/revenue
+**Purpose**: Revenue analysis and forecasting
+**URL**: `http://localhost:8136/analytics/revenue`
+**Method**: GET
+
+#### GET /analytics/customers
+**Purpose**: Customer behavior analytics
+**URL**: `http://localhost:8136/analytics/customers`
+**Method**: GET
+
+---
+
+### 🌐 6. WebSocket Real-Time Communication (5 endpoints)
+
+#### WS /ws/carts/{cart_id}
+**Purpose**: Real-time cart updates
+**URL**: `ws://localhost:8136/ws/carts/{cart_id}`
+**Protocol**: WebSocket
+
+**Message Types**:
+```json
+// Item added
+{
+  "type": "item_added",
+  "cart_id": 1,
+  "item": {"product_id": 101, "quantity": 1},
+  "timestamp": "2024-09-13T10:30:45Z"
+}
+
+// Item updated
+{
+  "type": "item_updated",
+  "cart_id": 1,
+  "item": {"product_id": 101, "quantity": 3},
+  "timestamp": "2024-09-13T10:31:15Z"
+}
+
+// Cart total changed
+{
+  "type": "total_updated",
+  "cart_id": 1,
+  "new_total": 1299.00,
+  "timestamp": "2024-09-13T10:31:15Z"
+}
+```
+
+#### WS /ws/inventory/{product_id}
+**Purpose**: Real-time inventory level updates
+**URL**: `ws://localhost:8136/ws/inventory/{product_id}`
+**Protocol**: WebSocket
+
+#### WS /ws/orders
+**Purpose**: Order status updates
+**URL**: `ws://localhost:8136/ws/orders`
+**Protocol**: WebSocket
+
+#### WS /ws/system/status
+**Purpose**: System-wide status notifications
+**URL**: `ws://localhost:8136/ws/system/status`
+**Protocol**: WebSocket
+
+#### WS /ws/analytics/live
+**Purpose**: Live analytics dashboard updates
+**URL**: `ws://localhost:8136/ws/analytics/live`
+**Protocol**: WebSocket
+
+---
+
+## 🔍 Detector Service Endpoints (Computer Vision)
+**Base URL**: `http://localhost:8100`
+**Framework**: FastAPI with YOLOv8 integration
+
+### 1. System Health Check
+
+#### GET /healthz
+**Purpose**: Detector service health and model status
+**URL**: `http://localhost:8100/healthz`
+**Method**: GET
+
+**Response Example**:
+```json
+{
+  "status": "healthy",
+  "model": {
+    "name": "YOLOv8",
+    "version": "8.0.196",
+    "loaded": true,
+    "device": "cpu",
+    "classes": 80
+  },
+  "memory": {
+    "used": "1.2 GB",
+    "available": "6.8 GB"
+  },
+  "timestamp": "2024-09-13T10:30:45Z"
+}
+```
+
+### 2. Object Detection
+
+#### POST /image
+**Purpose**: Detect objects in uploaded image
+**URL**: `http://localhost:8100/image`
+**Method**: POST
+**Content-Type**: multipart/form-data
+
+**Request**: Upload image file as form data
+**Form Field**: `file` (required)
+
+**Response Example**:
+```json
+{
+  "detections": [
+    {
+      "class": "bottle",
+      "confidence": 0.85,
+      "bbox": {
+        "x1": 100,
+        "y1": 150,
+        "x2": 200,
+        "y2": 300
+      }
+    },
+    {
+      "class": "cup",
+      "confidence": 0.92,
+      "bbox": {
+        "x1": 250,
+        "y1": 180,
+        "x2": 320,
+        "y2": 280
+      }
+    }
+  ],
+  "image_info": {
+    "width": 640,
+    "height": 480,
+    "format": "JPEG"
+  },
+  "processing_time": 0.234,
+  "model_version": "yolov8n.pt"
+}
+```
+
+**Supported Image Formats**: JPEG, PNG, BMP, WEBP
+**Maximum File Size**: 10MB
+**Processing Time**: ~200-500ms depending on image size
+
+### 3. Inventory Detection
+
+#### POST /inventory
+**Purpose**: Detect and count products for inventory management
+**URL**: `http://localhost:8100/inventory`
+**Method**: POST
+**Content-Type**: multipart/form-data
+
+**Request**: Upload shelf/store image
+**Form Field**: `file` (required)
+
+**Response Example**:
+```json
+{
+  "inventory_summary": {
+    "total_items": 15,
+    "categories": {
+      "bottle": 8,
+      "cup": 4,
+      "bowl": 3
+    }
+  },
+  "detailed_detections": [
+    {
+      "class": "bottle",
+      "confidence": 0.88,
+      "bbox": {"x1": 50, "y1": 100, "x2": 120, "y2": 250},
+      "estimated_product": "Water Bottle 500ml"
+    }
+  ],
+  "shelf_analysis": {
+    "occupancy_rate": 0.75,
+    "empty_spaces": 3,
+    "restocking_needed": ["cup", "bowl"]
+  },
+  "processing_time": 0.412
+}
+```
+
+---
+
+## 🗄️ Database Access Information
+**Host**: localhost
+**Port**: 3308
+**Database**: iotc25_advanced_support_squad
+**Username**: eggien
+**Password**: 0363802865
+
+### Direct Database Connection:
+```bash
+# MySQL Command Line
+mysql -h localhost -P 3308 -u eggien -p0363802865 iotc25_advanced_support_squad
+
+# Connection String Format
+mysql://eggien:0363802865@localhost:3308/iotc25_advanced_support_squad
+```
+
+### Database Schema Overview:
+```sql
+-- Main Tables
+SHOW TABLES;
++----------------------------------------+
+| Tables_in_iotc25_advanced_support_squad |
++----------------------------------------+
+| products                               |
+| carts                                  |
+| cart_items                             |
+| orders                                 |
+| order_items                            |
+| inventory_logs                         |
+| user_sessions                          |
++----------------------------------------+
+
+-- Key Relationships
+-- products -> cart_items (product_id)
+-- carts -> cart_items (cart_id)
+-- orders -> order_items (order_id)
+-- products -> order_items (product_id)
+```
+
+---
+
+## 🔧 Development & Testing Endpoints
+
+### API Documentation (Interactive)
+- **Swagger UI**: `http://localhost:8136/docs`
+- **ReDoc**: `http://localhost:8136/redoc`
+- **OpenAPI Schema**: `http://localhost:8136/openapi.json`
+
+### Detector Documentation
+- **Swagger UI**: `http://localhost:8100/docs`
+- **Model Info**: `http://localhost:8100/healthz`
+
+### Development Utilities:
+```bash
+# API Health Check
+curl http://localhost:8136/healthz
+
+# Detector Health Check  
+curl http://localhost:8100/healthz
+
+# Test Image Upload
+curl -X POST "http://localhost:8100/image" \
+  -H "accept: application/json" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@test_image.jpg"
+
+# Get All Products
+curl http://localhost:8136/products
+
+# Get Specific Cart
+curl http://localhost:8136/carts/1
+```
+
+---
+
+## 🚀 Production & Deployment Endpoints
+
+### Production URLs (when deployed):
+- **API Base**: `https://your-domain.com/api/`
+- **Detector**: `https://your-domain.com/detector/`
+- **WebSocket**: `wss://your-domain.com/ws/`
+
+### Load Balancer Configuration:
+```nginx
+# Nginx configuration for production
+upstream api_backend {
+    server api1:8136;
+    server api2:8136;
+    server api3:8136;
+}
+
+upstream detector_backend {
+    server detector1:8100;
+    server detector2:8100;
+}
+
+server {
+    listen 443 ssl;
+    server_name your-domain.com;
+    
+    location /api/ {
+        proxy_pass http://api_backend/;
+    }
+    
+    location /detector/ {
+        proxy_pass http://detector_backend/;
+    }
+    
+    location /ws/ {
+        proxy_pass http://api_backend/ws/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+---
+
+## 📊 Performance & Monitoring
+
+### Metrics Endpoints:
+- **API Metrics**: `http://localhost:8136/metrics` (Prometheus format)
+- **Detector Metrics**: `http://localhost:8100/metrics`
+- **System Status**: `http://localhost:8136/healthz`
+
+### Monitoring Integration:
+```yaml
+# docker-compose monitoring addition
+version: '3.8'
+services:
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+```
+
+---
+
+## 🔐 Security & Authentication
+
+### API Security Headers:
+```http
+# Response headers for security
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+```
+
+### CORS Configuration:
+```python
+# Allowed origins for CORS
+CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:8080", 
+    "https://your-domain.com"
+]
+```
+
+---
+
+## 📚 Quick Reference Summary
+
+### 🔗 Essential URLs:
+- **API Documentation**: http://localhost:8136/docs
+- **System Health**: http://localhost:8136/healthz
+- **Detector Health**: http://localhost:8100/healthz
+- **Database**: mysql://eggien:0363802865@localhost:3308/iotc25_advanced_support_squad
+
+### 📱 Mobile API Testing:
+```bash
+# Replace localhost with your computer's IP for mobile testing
+export HOST_IP=192.168.1.100
+curl http://$HOST_IP:8136/healthz
+```
+
+### 🚀 Key Capabilities:
+✅ **29 REST API endpoints** for complete e-commerce functionality  
+✅ **3 Computer Vision endpoints** for object detection and inventory  
+✅ **5 WebSocket endpoints** for real-time communication  
+✅ **Complete CRUD operations** for products, carts, orders  
+✅ **Advanced cart management** with multiple update modes  
+✅ **Real-time inventory tracking** with YOLOv8 detection  
+✅ **Analytics and reporting** with detailed insights  
+✅ **Production-ready deployment** with SSL and load balancing  
+
+---
+
+**Last Updated**: September 13, 2025  
+**Version**: 2.0 with comprehensive endpoint coverage  
+**Team**: Advanced Support Squad  
+**Competition**: IoT Challenge 2025 "Edge AI for smart retail"
