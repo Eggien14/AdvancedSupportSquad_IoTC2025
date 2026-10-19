@@ -36,7 +36,7 @@ Dịch Vụ API là cổng REST API trung tâm của Hệ Thống Xe Mua Sắm T
 DB_HOST=db                                    # Host cơ sở dữ liệu
 DB_PORT=3306                                  # Port cơ sở dữ liệu
 DB_USER=eggien                               # User cơ sở dữ liệu
-DB_PASSWORD=0363802865                       # Password cơ sở dữ liệu
+DB_PASSWORD=your_db_password                       # Password cơ sở dữ liệu
 DB_NAME=iotc25_advanced_support_squad        # Tên cơ sở dữ liệu
 API_PORT=8136                                # Port dịch vụ API
 CACHE_ENABLED=true                           # Bật cache

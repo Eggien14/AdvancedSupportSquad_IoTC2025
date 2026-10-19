@@ -540,10 +540,10 @@ services:
     ports:
       - "3308:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: 123456789
+      MYSQL_ROOT_PASSWORD: your_root_password
       MYSQL_DATABASE: iotc25_advanced_support_squad
       MYSQL_USER: eggien
-      MYSQL_PASSWORD: 0363802865
+      MYSQL_PASSWORD: your_db_password
       MYSQL_CHARSET: utf8mb4
       MYSQL_COLLATION: utf8mb4_unicode_ci
     volumes:
@@ -748,7 +748,7 @@ SERVER_IP=192.168.1.100           # Your actual network IP address
 DB_HOST=db                        # Docker service name
 DB_PORT=3306                      # Internal MySQL port
 DB_USER=eggien                    # Database username
-DB_PASSWORD=0363802865            # Database password
+DB_PASSWORD=your_db_password            # Database password
 DB_NAME=iotc25_advanced_support_squad
 
 # API Service Configuration
@@ -880,7 +880,7 @@ npx kill-port 8136 8118 8100 3308  # Node.js tool
 #### Database Connection Issues
 ```bash
 # Test database connectivity
-docker exec ass_server-db-1 mysqladmin ping -u eggien -p0363802865
+docker exec ass_server-db-1 mysqladmin ping -u eggien -p
 
 # Check database logs
 docker logs ass_server-db-1 --tail 50
@@ -958,7 +958,7 @@ curl -X POST "http://localhost:8100/api/v1/image" \
   -F "file=@test_image.jpg"
 
 # Database testing
-docker exec -it ass_server-db-1 mysql -u eggien -p0363802865 \
+docker exec -it ass_server-db-1 mysql -u eggien -p \
   iotc25_advanced_support_squad -e "SELECT COUNT(*) FROM product_master;"
 ```
 

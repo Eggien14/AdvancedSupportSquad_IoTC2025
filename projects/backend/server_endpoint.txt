@@ -31,7 +31,7 @@
 
 🗄️ Database Layer (MySQL)
 ├── 📍 Direct: localhost:3308
-├── 🔐 User: eggien / Password: 0363802865
+├── 🔐 User: eggien / Password: your_db_password
 └── 📚 Database: iotc25_advanced_support_squad
 ```
 
@@ -635,15 +635,15 @@
 **Port**: 3308
 **Database**: iotc25_advanced_support_squad
 **Username**: eggien
-**Password**: 0363802865
+**Password**: your_db_password
 
 ### Direct Database Connection:
 ```bash
 # MySQL Command Line
-mysql -h localhost -P 3308 -u eggien -p0363802865 iotc25_advanced_support_squad
+mysql -h localhost -P 3308 -u eggien -p iotc25_advanced_support_squad
 
 # Connection String Format
-mysql://eggien:0363802865@localhost:3308/iotc25_advanced_support_squad
+mysql://eggien:your_db_password@localhost:3308/iotc25_advanced_support_squad
 ```
 
 ### Database Schema Overview:
@@ -773,7 +773,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_SECURITY_ADMIN_PASSWORD=your_grafana_password
 ```
 
 ---
@@ -807,7 +807,7 @@ CORS_ORIGINS = [
 - **API Documentation**: http://localhost:8136/docs
 - **System Health**: http://localhost:8136/healthz
 - **Detector Health**: http://localhost:8100/healthz
-- **Database**: mysql://eggien:0363802865@localhost:3308/iotc25_advanced_support_squad
+- **Database**: mysql://eggien:your_db_password@localhost:3308/iotc25_advanced_support_squad
 
 ### 📱 Mobile API Testing:
 ```bash

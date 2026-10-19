@@ -36,7 +36,7 @@ The API Service is the central REST API gateway for the Smart Shopping Cart Syst
 DB_HOST=db                                    # Database host
 DB_PORT=3306                                  # Database port  
 DB_USER=eggien                               # Database user
-DB_PASSWORD=0363802865                       # Database password
+DB_PASSWORD=your_db_password                       # Database password
 DB_NAME=iotc25_advanced_support_squad        # Database name
 API_PORT=8136                                # API service port
 CACHE_ENABLED=true                           # Enable caching

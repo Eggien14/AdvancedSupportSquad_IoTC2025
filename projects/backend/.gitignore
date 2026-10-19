@@ -46,3 +46,6 @@ storage/**
 .env
 .env.*
 !.env.example
+# TLS certificates are generated at start-up by nginx/generate-ssl.sh
+nginx/certs/
+*.pem

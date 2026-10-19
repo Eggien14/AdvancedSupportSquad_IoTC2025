@@ -1,7 +1,8 @@
 # Smart Shopping Cart System - IoT Challenge 2025
 
-**Team: Advanced Support Squad**  
-**Organization: FPT Software & Silicon Labs**
+**Team: Advanced Support Squad** (5 members)  
+**Organization: FPT Software & Silicon Labs**  
+**Result: national final, Top 10 team**
 
 An integrated Edge AI solution for smart retail featuring real-time computer vision, BLE-based indoor positioning, voice recognition, and intelligent cart management. This system demonstrates advanced IoT capabilities including YOLOv8 object detection, trilateration-based positioning, and seamless multi-platform integration for the IoT Challenge 2025 "Edge AI for Smart Retail" competition.
 
@@ -500,26 +501,14 @@ cd projects\backend
 
 **Configure Environment Variables**
 
-Create `.env` file in `projects/backend/`:
+Passwords are not stored in the repository. Copy the template in `projects/backend/` and set your own values (`.env` is git-ignored):
 
-```env
-# Database Configuration
-MYSQL_ROOT_PASSWORD=your_secure_root_password
-MYSQL_DATABASE=smartcart_db
-MYSQL_USER=smartcart_user
-MYSQL_PASSWORD=your_secure_password
-
-# Service Ports
-API_PORT=8136
-DETECTOR_PORT=8100
-NGINX_HTTP_PORT=8136
-NGINX_HTTPS_PORT=8118
-MYSQL_PORT=3308
-
-# AI Model Configuration
-YOLO_MODEL_PATH=./my_model.pt
-CONFIDENCE_THRESHOLD=0.5
+```powershell
+copy .env.example .env
+# then edit MYSQL_ROOT_PASSWORD and MYSQL_PASSWORD in .env
 ```
+
+`docker-compose.yaml` reads these two values and stops with a clear message if they are missing. The database name (`iotc25_advanced_support_squad`), the database user (`eggien`) and the ports (MySQL 3308, API over HTTP 8136, HTTPS 8118, detector 8100) are set in the compose files. The HTTPS certificate is self-signed and generated at start-up by `nginx/generate-ssl.sh` for `SERVER_IP`.
 
 **Build and Start Services**
 
@@ -857,8 +846,8 @@ icc-25-advanced-support-squad-main/
 ```powershell
 cd projects\backend
 
-# Configure environment
-# Edit .env file with your settings
+# Configure environment (passwords are not in the repository)
+copy .env.example .env   # set MYSQL_ROOT_PASSWORD and MYSQL_PASSWORD
 
 # Start services (development mode)
 docker-compose -f docker-compose.simple.yaml up -d

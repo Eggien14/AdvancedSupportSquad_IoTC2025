@@ -513,10 +513,10 @@ services:
     ports:
       - "3308:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: 123456789
+      MYSQL_ROOT_PASSWORD: your_root_password
       MYSQL_DATABASE: iotc25_advanced_support_squad
       MYSQL_USER: eggien
-      MYSQL_PASSWORD: 0363802865
+      MYSQL_PASSWORD: your_db_password
       MYSQL_CHARSET: utf8mb4
       MYSQL_COLLATION: utf8mb4_unicode_ci
     volumes:
@@ -721,7 +721,7 @@ SERVER_IP=192.168.1.100           # Địa chỉ IP mạng thực tế của b�
 DB_HOST=db                        # Tên dịch vụ Docker
 DB_PORT=3306                      # Port MySQL nội bộ
 DB_USER=eggien                    # Username cơ sở dữ liệu
-DB_PASSWORD=0363802865            # Password cơ sở dữ liệu
+DB_PASSWORD=your_db_password            # Password cơ sở dữ liệu
 DB_NAME=iotc25_advanced_support_squad
 
 # Cấu Hình API Service
@@ -853,7 +853,7 @@ npx kill-port 8136 8118 8100 3308  # Node.js tool
 #### Vấn Đề Kết Nối Cơ Sở Dữ Liệu
 ```bash
 # Test kết nối cơ sở dữ liệu
-docker exec ass_server-db-1 mysqladmin ping -u eggien -p0363802865
+docker exec ass_server-db-1 mysqladmin ping -u eggien -p
 
 # Kiểm tra logs cơ sở dữ liệu
 docker logs ass_server-db-1 --tail 50
@@ -931,7 +931,7 @@ curl -X POST "http://localhost:8100/api/v1/image" \
   -F "file=@test_image.jpg"
 
 # Testing cơ sở dữ liệu
-docker exec -it ass_server-db-1 mysql -u eggien -p0363802865 \
+docker exec -it ass_server-db-1 mysql -u eggien -p \
   iotc25_advanced_support_squad -e "SELECT COUNT(*) FROM product_master;"
 ```
 
